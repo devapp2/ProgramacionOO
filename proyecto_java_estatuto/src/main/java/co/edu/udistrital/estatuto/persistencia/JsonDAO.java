@@ -1,7 +1,7 @@
 package co.edu.udistrital.estatuto.persistencia;
 
 import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
+//import com.google.gson.reflect.TypeToken;
 
 import java.io.*;
 import java.lang.reflect.Type;

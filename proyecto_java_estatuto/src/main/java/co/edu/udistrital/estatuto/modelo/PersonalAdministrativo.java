@@ -1,6 +1,6 @@
 package co.edu.udistrital.estatuto.modelo;
 
-import java.util.Objects;
+//import java.util.Objects;
 
 /**
  * Personal administrativo de la universidad.
