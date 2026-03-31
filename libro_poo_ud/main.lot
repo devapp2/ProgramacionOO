@@ -1,0 +1,56 @@
+\babel@toc {spanish}{}\relax 
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {1.1}{\ignorespaces Comparación de los cuatro paradigmas de programación principales. Fuente: elaboración del autor con base en \blx@tocontentsinit {0}\textcite {Sommerville2015} y \blx@tocontentsinit {0}\textcite {Pressman2014}.}}{2}{table.1.1}%
+\contentsline {table}{\numberline {1.2}{\ignorespaces Unidades académico-administrativas de la Universidad Distrital Francisco José de Caldas\ según el Acuerdo 004 de 2025.}}{6}{table.1.2}%
+\contentsline {table}{\numberline {1.3}{\ignorespaces Miembros de la comunidad universitaria según el Art.\ 8 del Acuerdo 004 de 2025.}}{8}{table.1.3}%
+\contentsline {table}{\numberline {1.4}{\ignorespaces Órganos de gobierno de la Universidad Distrital Francisco José de Caldas\ según el Art.\ 18 del Acuerdo 004 de 2025.}}{9}{table.1.4}%
+\contentsline {table}{\numberline {1.5}{\ignorespaces Componentes del sistema de formación según el Estatuto Académico (propuesta, noviembre de 2025), Arts.\ 13--18.}}{12}{table.1.5}%
+\contentsline {table}{\numberline {1.6}{\ignorespaces Ámbitos del -PFA- y su relación con la evaluación formativa. Fuente: Documento -PFA- Universidad Distrital Francisco José de Caldas\ (2023) y \blx@tocontentsinit {0}\textcite {Decreto1330_2019}.}}{13}{table.1.6}%
+\contentsline {table}{\numberline {1.7}{\ignorespaces Resumen de los doce \textit {sprints} del libro.}}{16}{table.1.7}%
+\contentsline {table}{\numberline {1.8}{\ignorespaces Comparativa \java \ vs.\ \rust \ en dimensiones relevantes para el dominio académico. Fuentes: \blx@tocontentsinit {0}\textcite {Bloch2018} y \blx@tocontentsinit {0}\textcite {Klabnik2023}.}}{17}{table.1.8}%
+\contentsline {table}{\numberline {1.9}{\ignorespaces Entregables, características del programa y criterios de la rúbrica del Sprint 1.}}{22}{table.1.9}%
+\contentsline {table}{\numberline {1.10}{\ignorespaces Tabla de alineación completa: unidades del libro, syllabus, resultados de aprendizaje y actividades/evidencias.}}{25}{table.1.10}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Actores del sistema de información y sus necesidades principales. Fuente: elaboración del autor con base en el Acuerdo 004 de 2025.}}{29}{table.2.1}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Procesos académicos del dominio con actores, entradas y salidas.}}{31}{table.2.2}%
+\contentsline {table}{\numberline {2.3}{\ignorespaces Requisitos funcionales: subsistema de gestión organizacional (RF-001 a RF-004). Fuente: Acuerdo 004 de 2025, Arts.\ 14--19.}}{33}{table.2.3}%
+\contentsline {table}{\numberline {2.4}{\ignorespaces Requisitos funcionales: subsistema de gestión de comunidad universitaria (RF-005 a RF-008). Fuente: Acuerdo 004 de 2025, Art.\ 8.}}{35}{table.2.4}%
+\contentsline {table}{\numberline {2.5}{\ignorespaces Requisitos funcionales: subsistema de gestión académica (RF-009 a RF-012). Fuente: Estatuto Académico (propuesta), Arts.\ 13--18; \blx@tocontentsinit {0}\textcite {Decreto1330_2019}.}}{36}{table.2.5}%
+\contentsline {table}{\numberline {2.6}{\ignorespaces Requisitos funcionales: subsistema de gestión de evaluación y -PFA- (RF-013 a RF-016). Fuente: Documento -PFA- Universidad Distrital Francisco José de Caldas\ (2023); \blx@tocontentsinit {0}\textcite {MEN2020_RA}.}}{38}{table.2.6}%
+\contentsline {table}{\numberline {2.7}{\ignorespaces Requisitos funcionales: subsistema de gestión de órganos colegiados (RF-017 a RF-020). Fuente: Acuerdo 004 de 2025, Art.\ 18.}}{40}{table.2.7}%
+\contentsline {table}{\numberline {2.8}{\ignorespaces Requisitos no funcionales del sistema (RNF-001 a RNF-008). Categorías según ISO/IEC 25010.}}{43}{table.2.8}%
+\contentsline {table}{\numberline {2.9}{\ignorespaces Entregables, características del programa y criterios de la rúbrica del Sprint 2.}}{50}{table.2.9}%
+\contentsline {table}{\numberline {2.10}{\ignorespaces Entregables, características del programa y criterios de la rúbrica del Sprint 3.}}{53}{table.2.10}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Diagramas -UML- empleados en el libro con su función y capítulo de desarrollo. Fuente: \blx@tocontentsinit {0}\textcite {Larman2004}.}}{56}{table.3.1}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Entregables, características del programa y criterios de la rúbrica del Sprint 4.}}{82}{table.3.2}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Entregables, características del programa y criterios de la rúbrica del Sprint 5.}}{85}{table.3.3}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Paquetes del sistema y sus responsabilidades.}}{88}{table.4.1}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Comparación de implementación \java \ vs.\ \rust \ en el sistema estatutario.}}{130}{table.4.2}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Concurrencia en \java \ vs.\ \rust .}}{152}{table.5.1}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Comparación de java y rust en ocho dimensiones}}{158}{table.5.2}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Componentes de la plataforma JUnit~5.}}{166}{table.6.1}%
+\contentsline {table}{\numberline {6.2}{\ignorespaces Contraste entre JUnit~5 y el mecanismo nativo de pruebas de \rust .}}{182}{table.6.2}%
+\contentsline {table}{\numberline {6.3}{\ignorespaces Ecosistema de herramientas de calidad: \java \ vs.\ \rust .}}{186}{table.6.3}%
+\contentsline {table}{\numberline {6.4}{\ignorespaces Principios SOLID: evaluación en el sistema del Estatuto UD.}}{194}{table.6.4}%
+\contentsline {table}{\numberline {6.5}{\ignorespaces Ecosistema de pruebas y calidad: \java \ vs.\ \rust \ (comparativa).}}{204}{table.6.5}%
+\contentsline {table}{\numberline {6.6}{\ignorespaces Entregables, características y rúbrica del Sprint~10.}}{208}{table.6.6}%
+\contentsline {table}{\numberline {6.7}{\ignorespaces Entregables, características y rúbrica del Sprint~11.}}{212}{table.6.7}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {7.1}{\ignorespaces Taxonomía de asistentes computacionales generativos relevantes para el aprendizaje de la POO. Elaboración del autor (primer trimestre de 2026).}}{217}{table.7.1}%
+\contentsline {table}{\numberline {7.2}{\ignorespaces Oportunidades y riesgos del empleo de software generativo en el aprendizaje de la POO (Sistema Estatutario Universidad Distrital Francisco José de Caldas). Elaboración del autor.}}{221}{table.7.2}%
+\contentsline {table}{\numberline {7.3}{\ignorespaces Comparación entre el modelo de evaluación tradicional y el modelo centrado en el razonamiento de diseño. Fuente: Elaboración del autor.}}{230}{table.7.3}%
+\contentsline {table}{\numberline {7.4}{\ignorespaces Dimensiones del marco ético para el uso de software generativo en el contexto académico de la Universidad Distrital Francisco José de Caldas. Elaboración del autor.}}{234}{table.7.4}%
+\contentsline {table}{\numberline {7.5}{\ignorespaces Comparación cualitativa de la calidad del código generado para \java \ y \rust \ (Sistema Estatutario Universidad Distrital Francisco José de Caldas). Elaboración del autor.}}{237}{table.7.5}%
+\contentsline {table}{\numberline {7.6}{\ignorespaces Entregables, características y criterios de la rúbrica del Sprint~12.}}{242}{table.7.6}%
+\contentsline {table}{\numberline {7.7}{\ignorespaces Rúbrica integral del proyecto a lo largo de los doce \textit {sprints}.}}{247}{table.7.7}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {A.1}{\ignorespaces Glosario de términos institucionales de la Universidad Distrital Francisco José de Caldas\ empleados en el libro. Las definiciones se basan en el Acuerdo 004 de 2025\ y en la propuesta de Estatuto Académico (noviembre de 2025).}}{256}{table.A.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {B.1}{\ignorespaces Artículos del Acuerdo 004 de 2025 con entidades y requisitos relacionados en el sistema de información.}}{258}{table.B.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {C.1}{\ignorespaces Matriz de trazabilidad: requisitos funcionales y artículos del estatuto. Las referencias al Estatuto Académico corresponden a la propuesta presentada por el Consejo Académico en noviembre de 2025.}}{262}{table.C.1}%
+\addvspace {10\p@ }

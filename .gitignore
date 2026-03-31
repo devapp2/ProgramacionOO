@@ -1,0 +1,37 @@
+# --- LaTeX (libro_poo_ud/) ---
+libro_poo_ud/*.aux
+libro_poo_ud/*.log
+libro_poo_ud/*.out
+libro_poo_ud/*.bbl
+libro_poo_ud/*.toc
+libro_poo_ud/*.blg
+libro_poo_ud/*.bcg
+libro_poo_ud/*.bcf
+libro_poo_ud/*.lof
+libro_poo_ud/*.toc
+libro_poo_ud/*.pdf
+libro_poo_ud/*.fdb_latexmk
+libro_poo_ud/*.fls
+libro_poo_ud/*.synctex.gz
+libro_poo_ud/*.xml
+
+# --- Java (proyecto_java_estatuto/) ---
+**/target/
+**/bin/
+**/*.class
+proyecto_java_estatuto/.settings/
+proyecto_java_estatuto/.classpath
+proyecto_java_estatuto/.project
+proyecto_java_estatuto/.vscode
+proyecto_java_estatuto/target/
+
+# --- Rust (proyecto_rust_estatuto/) ---
+# Esto ignora la carpeta target sin importar qué tan profundo esté
+**/target/
+proyecto_rust_estatuto/Cargo.lock
+proyecto_rust_estatuto/.vscode/
+
+# --- General ---
+*.zip
+*.log
+.DS_Store

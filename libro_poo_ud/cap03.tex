@@ -1,0 +1,1448 @@
+%% ============================================================
+%% cap03.tex — Capítulo 3
+%% Modelado UML del dominio académico-administrativo
+%% ============================================================
+
+\chapter{Modelado -UML- del dominio académico-administrativo}
+\label{cap:uml}
+
+\noindent
+El modelado mediante el Lenguaje Unificado de Modelado (-UML-,
+\textit{Unified Modeling Language}) constituye el puente entre el análisis
+del dominio, desarrollado en el Capítulo~\ref{cap:requisitos}, y la
+implementación, que se abordará en los Capítulos siguientes. Puesto que
+el dominio del Estatuto General y del Estatuto Académico de la \ud\
+presenta una estructura jerárquica y relacional de considerable complejidad,
+el rigor en el modelado no es un requisito formal: es una condición
+necesaria para que el código resultante sea comprensible, mantenible
+y extensible.
+
+Dos advertencias antes de comenzar. La primera: un diagrama -UML- no es
+---o no debería ser--- una representación fotográfica del código que se
+implementará. Es una herramienta de comunicación y de razonamiento; modela
+aspectos del dominio que el equipo de desarrollo necesita discutir antes
+de codificar. La segunda: \plantuml\ ---empleado a lo largo de este capítulo
+como herramienta de generación de diagramas a partir de texto plano---
+introduce limitaciones notacionales respecto del estándar -UML-
+completo, pero su ventaja de ser versionable en sistemas de control de
+código fuente la hace especialmente adecuada para el entorno pedagógico
+de este libro.\footnote{%
+  \plantuml\ implementa un subconjunto del estándar -UML- 2.5. Las limitaciones
+  más relevantes son: ausencia de soporte nativo para algunos tipos de
+  multiplicidad con restricciones, notación simplificada para interfaces
+  y realización, y representación limitada de restricciones -OCL-. Para el
+  nivel introductorio de este libro, estas limitaciones no generan
+  menoscabo apreciable.}
+
+%% ─────────────────────────────────────────────
+\section{Introducción al lenguaje -UML- y \plantuml}
+\label{sec:uml-intro}
+%% ─────────────────────────────────────────────
+
+El estándar -UML- 2.5 define catorce tipos de diagramas organizados en
+dos grandes familias: diagramas estructurales y diagramas de comportamiento.
+La Tabla~\ref{tab:diagramas-uml} describe los empleados en este libro,
+con indicación de su función y del capítulo en que se desarrolla cada uno.
+
+\begingroup
+\small
+\begin{longtable}{L{2.8cm} L{2.2cm} L{6cm} C{1.8cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Diagramas -UML- empleados en el libro con su función y capítulo de desarrollo. Fuente: \textcite{Larman2004}.} \label{tab:diagramas-uml} \\
+	\toprule
+	\textbf{Diagrama} & \textbf{Familia} & \textbf{Función en el libro} & \textbf{Capítulo} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Diagrama} & \textbf{Familia} & \textbf{Función en el libro} & \textbf{Capítulo} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Clases (dominio)
+	& Estructural
+	& Modelar la jerarquía de entidades, atributos, relaciones y restricciones del dominio académico-administrativo de la \ud
+	& 3 \\
+	\midrule
+	
+	Casos de uso
+	& Comportamiento
+	& Especificar el comportamiento del sistema desde la perspectiva de los actores institucionales; derivar de las historias de usuario
+	& 3 \\
+	\midrule
+	
+	Secuencia
+	& Comportamiento
+	& Modelar la interacción dinámica entre objetos en los flujos de proceso más complejos (matrícula, evaluación con rúbrica)
+	& 3 \\
+	\midrule
+	
+	Estado
+	& Comportamiento
+	& Modelar el ciclo de vida de entidades con estados bien definidos (Estudiante, ProgramaAcademico)
+	& 3 \\
+	\midrule
+	
+	Paquetes
+	& Estructural
+	& Organizar las clases del dominio en los cinco módulos del sistema
+	& 4, 5 \\
+	\midrule
+	
+	Componentes
+	& Estructural
+	& Modelar la arquitectura del sistema y sus dependencias de despliegue
+	& 6 \\
+\end{longtable}
+\endgroup
+
+\plantuml\ se integra con el flujo de trabajo de compilación \LaTeX\ mediante
+la herramienta \texttt{plantuml.jar}, que convierte los archivos \texttt{.puml}
+en imágenes -SVG- o -PNG- que \LaTeX\ puede incluir con \verb|\includegraphics|.
+En este libro, los diagramas se presentan como listados de código -PlantUML-
+reproducibles: el lector puede copiar el código y generar la imagen de manera
+local, lo que garantiza que los modelos sean verificables y versionables.
+La convención adoptada para los identificadores -UML- del libro es:
+\texttt{lst:plantuml-<tipo>-<subsistema>} para los listados
+y \texttt{fig:uml-<tipo>-<subsistema>} para las figuras.
+
+%% ─────────────────────────────────────────────
+\section{Diagramas de casos de uso del sistema}
+\label{sec:casos-uso}
+%% ─────────────────────────────────────────────
+
+Los diagramas de casos de uso se construyen a partir de las historias de
+usuario del \textit{product backlog} (Sección~\ref{sec:historias-usuario})
+y los requisitos funcionales (Sección~\ref{sec:req-funcionales}). Cada
+actor institucional se asocia con los casos de uso que le conciernen,
+organizados en tres subsistemas funcionales.
+
+\subsection{Casos de uso del subsistema organizacional}
+\label{subsec:uc-organizacional}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de casos de uso del subsistema organizacional (PlantUML).},
+  label={lst:plantuml-uc-org}]
+@startuml uc_organizacional
+skinparam actorStyle awesome
+skinparam usecaseBackgroundColor #F0F4FF
+skinparam usecaseBorderColor #00467F
+skinparam arrowColor #00467F
+
+left to right direction
+
+actor "Rector" as rector
+actor "Decano" as decano
+actor "Director de Escuela" as dir_escuela
+actor "Personal\nadministrativo" as admin
+
+rectangle "Subsistema Organizacional" {
+  usecase "Registrar Facultad" as RF_FAC
+  usecase "Modificar datos de Facultad" as MOD_FAC
+  usecase "Registrar Escuela" as RF_ESC
+  usecase "Adscribir docente\na Escuela" as ADSC_DOC
+  usecase "Registrar Centro" as RF_CEN
+  usecase "Registrar Instituto" as RF_INST
+  usecase "Registrar CABA" as RF_CABA
+  usecase "Consultar estructura\norganizacional" as CONS_ORG
+  usecase "Generar reporte de\ncomposicion institucional" as REP_COMP
+  usecase "Gestionar directivo\nde unidad" as GEST_DIR
+}
+
+rector --> RF_FAC
+rector --> MOD_FAC
+rector --> CONS_ORG
+rector --> REP_COMP
+
+decano --> RF_ESC
+decano --> RF_CEN
+decano --> RF_INST
+decano --> RF_CABA
+decano --> CONS_ORG
+decano --> GEST_DIR
+
+dir_escuela --> ADSC_DOC
+dir_escuela --> CONS_ORG
+
+admin --> CONS_ORG
+admin --> REP_COMP
+
+RF_ESC ..> RF_FAC : <<include>>
+RF_CABA ..> RF_ESC : <<include>>
+ADSC_DOC ..> RF_ESC : <<include>>
+
+@enduml
+\end{lstlisting}
+
+Los casos de uso del subsistema organizacional reflejan directamente las
+restricciones del \acuerdo: registrar una Escuela presupone que ya existe
+una Facultad a la que adscribirla (\textit{include}); adscribir un docente
+presupone que la Escuela de destino ya existe. La relación de inclusión
+expresa estas dependencias normativas de forma explícita en el modelo.
+
+\subsection{Casos de uso del subsistema académico}
+\label{subsec:uc-academico}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de casos de uso del subsistema académico (PlantUML).},
+  label={lst:plantuml-uc-acad}]
+@startuml uc_academico
+skinparam actorStyle awesome
+skinparam usecaseBackgroundColor #F0F4FF
+skinparam usecaseBorderColor #00467F
+skinparam arrowColor #00467F
+
+left to right direction
+
+actor "Director de Programa" as dir_prog
+actor "Docente" as docente
+actor "Estudiante" as estudiante
+actor "Personal\nadministrativo" as admin
+
+rectangle "Subsistema Academico" {
+  usecase "Registrar Programa\nAcademico" as RF_PROG
+  usecase "Gestionar Plan\nde Estudios" as GEST_PLAN
+  usecase "Registrar Espacio\nAcademico" as RF_ESP
+  usecase "Asignar docente a\nespacio academico" as ASIG_DOC
+  usecase "Matricular Estudiante" as MATR
+  usecase "Consultar oferta\nacademica" as CONS_OFE
+  usecase "Actualizar PEP" as ACT_PEP
+  usecase "Generar reporte\nde cobertura" as REP_COB
+  usecase "Consultar historial\nacademico" as CONS_HIST
+}
+
+dir_prog --> RF_PROG
+dir_prog --> GEST_PLAN
+dir_prog --> RF_ESP
+dir_prog --> ACT_PEP
+dir_prog --> REP_COB
+
+docente --> ASIG_DOC
+docente --> CONS_OFE
+
+estudiante --> CONS_HIST
+estudiante --> CONS_OFE
+
+admin --> MATR
+admin --> CONS_OFE
+
+GEST_PLAN ..> RF_PROG : <<include>>
+RF_ESP ..> GEST_PLAN : <<include>>
+ASIG_DOC ..> RF_ESP : <<include>>
+MATR ..> RF_PROG : <<include>>
+
+ACT_PEP .> GEST_PLAN : <<extend>>
+
+@enduml
+\end{lstlisting}
+
+\subsection{Casos de uso del subsistema de evaluación}
+\label{subsec:uc-evaluacion}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de casos de uso del subsistema de evaluación y -PFA-
+    (PlantUML).},
+  label={lst:plantuml-uc-eval}]
+@startuml uc_evaluacion
+skinparam actorStyle awesome
+skinparam usecaseBackgroundColor #F0F4FF
+skinparam usecaseBorderColor #00467F
+skinparam arrowColor #00467F
+
+left to right direction
+
+actor "Director de Programa" as dir_prog
+actor "Docente" as docente
+actor "Estudiante" as estudiante
+actor "Coordinador CABA" as coord
+
+rectangle "Subsistema de Evaluacion y PFA" {
+  usecase "Registrar RA\ndel programa" as RF_RA
+  usecase "Registrar PFA de\nespacio academico" as RF_PFA
+  usecase "Definir Rubrica\nde evaluacion" as DEF_RUB
+  usecase "Registrar Evidencia\nde Aprendizaje" as RF_EVID
+  usecase "Calcular avance del\nestudiante frente a RA" as CALC_AV
+  usecase "Generar reporte de\nseguimiento PFA" as REP_PFA
+  usecase "Consultar avance\npropio" as CONS_AV
+}
+
+dir_prog --> RF_RA
+dir_prog --> RF_PFA
+dir_prog --> REP_PFA
+
+docente --> DEF_RUB
+docente --> RF_EVID
+docente --> CALC_AV
+
+coord --> RF_PFA
+coord --> REP_PFA
+
+estudiante --> CONS_AV
+
+RF_EVID ..> DEF_RUB : <<include>>
+CALC_AV ..> RF_EVID : <<include>>
+REP_PFA ..> RF_PFA : <<include>>
+CONS_AV ..> CALC_AV : <<include>>
+
+@enduml
+\end{lstlisting}
+
+\subsubsection*{Descripción expandida: caso de uso «Registrar Evidencia de Aprendizaje»}
+
+Este caso de uso concentra la mayor complejidad del subsistema de evaluación,
+toda vez que involucra a docente, rúbrica, evidencia y cálculo de avance en
+una secuencia interdependiente.
+
+\textbf{Actor principal:} Docente.\\
+\textbf{Actores secundarios:} Estudiante (receptor de la calificación),
+Director de Programa (consulta el avance).
+
+\textbf{Precondición:} el espacio académico tiene al menos una rúbrica
+definida (ver caso de uso «Definir Rúbrica»); el estudiante está matriculado
+en el espacio académico.
+
+\textbf{Flujo principal:}
+\begin{enumerate}[label=\arabic*.]
+  \item El docente accede al espacio académico asignado y selecciona el
+    estudiante a evaluar.
+  \item El sistema presenta las rúbricas disponibles para el espacio académico.
+  \item El docente selecciona la rúbrica correspondiente a la actividad
+    formativa.
+  \item El sistema muestra los criterios de la rúbrica con los niveles
+    de desempeño.
+  \item El docente selecciona el nivel de desempeño para cada criterio
+    y, opcionalmente, adjunta un archivo de evidencia.
+  \item El sistema calcula la calificación según la ponderación de la rúbrica.
+  \item El docente confirma el registro y el sistema almacena la evidencia
+    con fecha, hora y actor responsable (RNF-003).
+  \item El sistema actualiza el cálculo de avance del estudiante frente
+    a los RA del programa.
+\end{enumerate}
+
+\textbf{Flujo alternativo A} (el docente detecta un error en la calificación):
+el docente puede modificar el registro dentro de las 48 horas siguientes.
+Pasado ese plazo, solo el Director de Programa puede modificarlo, dejando
+trazabilidad del cambio.
+
+\textbf{Postcondición:} la evidencia queda registrada, la calificación
+almacenada y el avance del estudiante actualizado.
+
+%% ─────────────────────────────────────────────
+\section{Diagrama de clases del dominio}
+\label{sec:clases-dominio}
+%% ─────────────────────────────────────────────
+
+El diagrama de clases del dominio se presenta en cuatro vistas complementarias.
+La representación del dominio completo en un único diagrama resultaría
+inmanejable ---y didácticamente contraproducente---, toda vez que la
+complejidad de la jerarquía de unidades académicas, actores, programas
+y evaluación supera con creces lo que un diagrama de una sola página puede
+comunicar con claridad. Cada vista se acompaña de una justificación
+de las decisiones de diseño más relevantes.
+
+\subsection{Jerarquía de unidades académicas}
+\label{subsec:jerarquia-unidades}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Jerarquía completa de unidades académicas de la \ud\ (PlantUML).},
+  label={lst:plantuml-clases-org}]
+@startuml clases_organizacional
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam classBackgroundColor #F8F8FF
+skinparam classBorderColor #00467F
+skinparam ArrowColor #00467F
+
+abstract class UnidadAcademica {
+  # nombre : String
+  # codigo : String
+  # fechaCreacion : LocalDate
+  # estado : EstadoUnidad
+  + getNombre() : String
+  + getCodigo() : String
+  + getEstado() : EstadoUnidad
+  + {abstract} getTipo() : String
+  + {abstract} getDirector() : String
+}
+
+class Universidad {
+  - nombre : String
+  - nit : String
+  - mision : String
+  + getFacultades() : List<Facultad>
+  + agregarFacultad(f : Facultad) : void
+}
+
+class Facultad {
+  - decano : String
+  - codigoFacultad : String
+  + getDecano() : String
+  + getEscuelas() : List<Escuela>
+  + agregarEscuela(e : Escuela) : void
+  + getCentros() : List<Centro>
+  + getInstitutos() : List<Instituto>
+  + getTipo() : String
+  + getDirector() : String
+}
+
+class Escuela {
+  - directorEscuela : String
+  + getDirectorEscuela() : String
+  + getDocentesAdscritos() : List<Docente>
+  + adscribirDocente(d : Docente) : void
+  + getCABAs() : List<CABA>
+  + getTipo() : String
+  + getDirector() : String
+}
+
+class Centro {
+  - director : String
+  - mision : String
+  + getTipo() : String
+  + getDirector() : String
+}
+
+class Instituto {
+  - director : String
+  - areaTematica : String
+  + getTipo() : String
+  + getDirector() : String
+}
+
+class CABA {
+  - coordinador : String
+  + getCoordinador() : String
+  + getAreaDeFormacion() : AreaDeFormacion
+  + getTipo() : String
+  + getDirector() : String
+}
+
+class AreaDeFormacion {
+  - nombre : String
+  - codigo : String
+  + getProgramas() : List<ProgramaAcademico>
+  + agregarPrograma(p : ProgramaAcademico) : void
+}
+
+class ProgramaAcademico {
+  - nombre : String
+  - codigoSNIES : String
+  - nivel : NivelAcademico
+  - estado : EstadoPrograma
+  - fechaRegistroCalificado : LocalDate
+  + getNombre() : String
+  + getNivel() : NivelAcademico
+  + getPlanDeEstudios() : PlanDeEstudios
+}
+
+class PlanDeEstudios {
+  - version : String
+  - totalCreditos : int
+  - fechaAprobacion : LocalDate
+  + getEspacios() : List<EspacioAcademico>
+  + agregarEspacio(e : EspacioAcademico) : void
+  + getTotalCreditos() : int
+}
+
+class EspacioAcademico {
+  - nombre : String
+  - codigo : String
+  - creditos : int
+  - nivelFormacion : String
+  + getNombre() : String
+  + getCreditos() : int
+  + getDocenteAsignado() : Docente
+}
+
+enum EstadoUnidad {
+  ACTIVA
+  INACTIVA
+  EN_CREACION
+}
+
+enum EstadoPrograma {
+  EN_DISENO
+  EN_TRAMITE
+  ACTIVO
+  EN_RENOVACION
+  CERRADO
+}
+
+enum NivelAcademico {
+  PREGRADO
+  ESPECIALIZACION
+  MAESTRIA
+  DOCTORADO
+}
+
+UnidadAcademica <|-- Facultad
+UnidadAcademica <|-- Escuela
+UnidadAcademica <|-- Centro
+UnidadAcademica <|-- Instituto
+
+Universidad "1" *-- "1..*" Facultad : contiene
+Facultad "1" *-- "0..*" Escuela : agrupa
+Facultad "1" o-- "0..*" Centro : contiene
+Facultad "1" o-- "0..*" Instituto : contiene
+Escuela "1" o-- "0..*" CABA : coordina
+Facultad "1" o-- "1..*" AreaDeFormacion : organiza
+AreaDeFormacion "1" --> "1..*" ProgramaAcademico : ofrece
+ProgramaAcademico "1" *-- "1" PlanDeEstudios : define
+PlanDeEstudios "1" *-- "1..*" EspacioAcademico : contiene
+
+UnidadAcademica --> EstadoUnidad
+ProgramaAcademico --> EstadoPrograma
+ProgramaAcademico --> NivelAcademico
+
+@enduml
+\end{lstlisting}
+
+\textbf{Justificación de las decisiones de diseño.} La clase
+\texttt{UnidadAcademica} se modela como abstracta porque ningún objeto del
+sistema es ``una unidad académica genérica'': siempre se trata de una Facultad,
+una Escuela, un Centro o un Instituto concreto. El método \texttt{getTipo()}
+abstracto fuerza a cada subclase a declarar su tipo, lo que permite escribir
+código polimórfico que genere reportes sin conocer el tipo concreto de cada
+unidad. La relación entre \texttt{Facultad} y \texttt{Escuela} es de
+composición ---representada con el rombo relleno--- porque el \acuerdo\
+establece que las Escuelas pertenecen a una Facultad y no tienen existencia
+autónoma fuera de ella. La relación entre \texttt{Escuela} y \texttt{CABA}
+es de agregación, puesto que el estatuto sugiere que los CABAS son mecanismos
+de coordinación que articulan docencia e investigación, no subunidades
+con existencia completamente dependiente de la Escuela.\footnote{%
+  La distinción entre composición y agregación ---rombo relleno vs.\ rombo
+  vacío en la notación -UML--- no siempre es inmediata a partir del texto
+  del estatuto. En la experiencia docente acumulada entre 2020 y 2025 en
+  la Facultad de Ingeniería de la \ud, sede Macarena, este es uno de los
+  puntos donde los estudiantes más frecuentemente consultan al asistente
+  computacional y aceptan su respuesta sin verificar si la semántica es
+  coherente con el dominio. La regla práctica es: composición cuando la
+  destrucción del contenedor implica la destrucción del contenido;\\aggregación
+  cuando el contenido puede existir de forma independiente.}
+
+\subsection{Jerarquía de actores institucionales}
+\label{subsec:jerarquia-actores}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Jerarquía de actores institucionales (PlantUML).
+    Clase abstracta \texttt{Persona} y sus subclases según el Art.\ 8
+    del \acuerdo.},
+  label={lst:plantuml-clases-actores}]
+@startuml clases_actores
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam classBackgroundColor #F8F8FF
+skinparam classBorderColor #00467F
+skinparam ArrowColor #00467F
+
+abstract class Persona {
+  # nombres : String
+  # apellidos : String
+  # identificacion : String
+  # tipoId : TipoIdentificacion
+  # correoInstitucional : String
+  + getNombreCompleto() : String
+  + getIdentificacion() : String
+  + {abstract} getRol() : String
+}
+
+class Docente {
+  - tipoVinculacion : TipoDocente
+  - fechaVinculacion : LocalDate
+  - escuelaAdscrita : Escuela
+  - especialidades : List<String>
+  + getTipoVinculacion() : TipoDocente
+  + getEscuelaAdscrita() : Escuela
+  + getEspaciosAsignados() : List<EspacioAcademico>
+  + getRol() : String
+}
+
+class Estudiante {
+  - codigoEstudiante : String
+  - estado : EstadoEstudiante
+  - programaMatriculado : ProgramaAcademico
+  - creditosAcumulados : int
+  + getCodigoEstudiante() : String
+  + getEstado() : EstadoEstudiante
+  + getProgramaMatriculado() : ProgramaAcademico
+  + getAvanceRA() : double
+  + getRol() : String
+}
+
+class PersonalAdministrativo {
+  - cargo : String
+  - dependencia : String
+  - nivelCargo : NivelCargo
+  + getCargo() : String
+  + getDependencia() : String
+  + getRol() : String
+}
+
+class Egresado {
+  - codigoEstudianteOriginal : String
+  - programaGraduado : ProgramaAcademico
+  - fechaGrado : LocalDate
+  - tituloObtenido : String
+  + getProgramaGraduado() : ProgramaAcademico
+  + getTituloObtenido() : String
+  + getRol() : String
+}
+
+class Matricula {
+  - periodo : String
+  - fechaMatricula : LocalDate
+  - estado : EstadoMatricula
+  - creditosInscritos : int
+  + getPeriodo() : String
+  + getEstado() : EstadoMatricula
+  + cancelar() : void
+}
+
+enum TipoDocente {
+  PLANTA
+  OCASIONAL
+  HORA_CATEDRA
+  VISITANTE
+  EXPERTO
+}
+
+enum EstadoEstudiante {
+  ASPIRANTE
+  ADMITIDO
+  ACTIVO
+  SUSPENSION
+  EN_GRADO
+  GRADUADO
+  RETIRADO
+}
+
+enum EstadoMatricula {
+  ACTIVA
+  CANCELADA
+  BLOQUEADA
+  EN_GRADO
+}
+
+enum TipoIdentificacion {
+  CC
+  TI
+  CE
+  PASAPORTE
+}
+
+enum NivelCargo {
+  DIRECTIVO
+  ASESOR
+  PROFESIONAL
+  TECNICO
+  ASISTENCIAL
+}
+
+Persona <|-- Docente
+Persona <|-- Estudiante
+Persona <|-- PersonalAdministrativo
+Persona <|-- Egresado
+
+Docente --> TipoDocente : tipoVinculacion
+Docente --> Escuela : adscrito a
+Estudiante --> EstadoEstudiante
+Matricula --> EstadoMatricula
+Persona --> TipoIdentificacion
+
+Estudiante "1" --> "1..*" Matricula : tiene
+Matricula --> ProgramaAcademico : en
+
+@enduml
+\end{lstlisting}
+
+\textbf{Justificación.} La clase abstracta \texttt{Persona} agrupa los
+atributos de identificación comunes a todos los miembros de la comunidad
+universitaria: nombre, identificación y correo institucional. El método
+\texttt{getRol()} abstracto fuerza a cada subclase a declarar su rol en
+el sistema, lo que permite construir componentes de -UI- genéricos que
+muestren el rol del usuario autenticado sin un bloque de condicionales.
+
+La decisión de no modelar subclases de \texttt{Docente} para los cinco tipos
+de vinculación ---y utilizar en cambio el enumerado \texttt{TipoDocente}---
+responde a que, en el dominio de la \ud\ según el \acuerdo, los cinco tipos
+no difieren en comportamiento sino en atributos: el tipo de contrato,
+la fecha de vinculación y algunos derechos administrativos. Si en una fase
+posterior del sistema se requiriese modelar la liquidación de honorarios
+---proceso cuyas reglas difieren sustancialmente por tipo de vinculación---,
+la conversión del enumerado en una jerarquía de subclases podría justificarse.
+Por ahora, la solución más simple es la más adecuada.\footnote{%
+  El principio \textsc{YAGNI} (\textit{You Aren't Gonna Need It}), aunque
+  proveniente de las metodologías ágiles y no del -UML- clásico, aplica
+  directamente a esta decisión: modelar las subclases de \texttt{Docente}
+  ahora, antes de que exista un requisito funcional que las justifique,
+  introduce complejidad sin beneficio observable. \textcite{Fowler2018}
+  cataloga este antipatrón como \textit{Speculative Generality}: la
+  generalización prematura que ninguna funcionalidad real solicita.}
+
+\subsection{Programas, planes de estudio y espacios académicos}
+\label{subsec:modelo-programas}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Modelo de programas académicos, planes de estudio y espacios
+    académicos (PlantUML).},
+  label={lst:plantuml-clases-acad}]
+@startuml clases_academico
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam classBackgroundColor #F8F8FF
+skinparam classBorderColor #00467F
+skinparam ArrowColor #00467F
+
+class ProgramaAcademico {
+  - nombre : String
+  - codigoSNIES : String
+  - nivel : NivelAcademico
+  - estado : EstadoPrograma
+  - fechaRegistro : LocalDate
+  + getNombre() : String
+  + getPlanVigente() : PlanDeEstudios
+  + getResultadosAprendizaje() : List<ResultadoDeAprendizaje>
+}
+
+class PlanDeEstudios {
+  - version : String
+  - totalCreditos : int
+  - fechaAprobacion : LocalDate
+  - organoAprobador : String
+  + getVersion() : String
+  + getTotalCreditos() : int
+  + getEspaciosPorSemestre(sem : int) : List<EspacioAcademico>
+}
+
+class EspacioAcademico {
+  - nombre : String
+  - codigo : String
+  - creditos : int
+  - semestre : int
+  - nivelFormacion : String
+  + getCreditos() : int
+  + getPrerrequisitos() : List<EspacioAcademico>
+  + getCorequisitos() : List<EspacioAcademico>
+  + getPFA() : List<PropositoDeFormacion>
+}
+
+class ProyectoEducativoDePrograma {
+  - version : String
+  - fechaAprobacion : LocalDate
+  - perfilEgresado : String
+  - perfilIngreso : String
+  + getResultadosAprendizaje() : List<ResultadoDeAprendizaje>
+  + getPlanVigente() : PlanDeEstudios
+}
+
+class ResultadoDeAprendizaje {
+  - codigo : String
+  - descripcion : String
+  - verboBloom : String
+  - nivel : NivelBloom
+  + getCodigo() : String
+  + getDescripcion() : String
+  + getNivel() : NivelBloom
+}
+
+class PropositoDeFormacion {
+  - ambito : AmbitoPFA
+  - descripcion : String
+  + getAmbito() : AmbitoPFA
+  + getResultadosVinculados() : List<ResultadoDeAprendizaje>
+}
+
+enum AmbitoPFA {
+  ONTOLOGICO
+  EPISTEMOLOGICO
+  CONTEXTUAL
+}
+
+enum NivelBloom {
+  RECORDAR
+  COMPRENDER
+  APLICAR
+  ANALIZAR
+  EVALUAR
+  CREAR
+}
+
+ProgramaAcademico "1" *-- "1..*" PlanDeEstudios : versiona
+ProgramaAcademico "1" *-- "1" ProyectoEducativoDePrograma : define
+PlanDeEstudios "1" *-- "1..*" EspacioAcademico : contiene
+EspacioAcademico "0..*" o-- "0..*" EspacioAcademico : prerrequisito de >
+EspacioAcademico "1" *-- "0..*" PropositoDeFormacion : define
+PropositoDeFormacion "1..*" --> "1..*" ResultadoDeAprendizaje : vincula
+ProgramaAcademico "1" --> "1..*" ResultadoDeAprendizaje : declara
+PropositoDeFormacion --> AmbitoPFA
+ResultadoDeAprendizaje --> NivelBloom
+
+@enduml
+\end{lstlisting}
+
+\textbf{Justificación.} La relación reflexiva de \texttt{EspacioAcademico}
+con sí mismo modela la restricción de prerrequisitos: un espacio académico
+puede tener cero o más prerrequisitos, que son otros espacios académicos
+del mismo plan de estudios. La multiplicidad 0..* en ambos extremos expresa
+que algunos espacios no tienen prerrequisitos (electivas de primer semestre)
+y que un espacio puede ser prerrequisito de varios otros.
+
+La existencia de múltiples versiones del \texttt{PlanDeEstudios} para un
+mismo \texttt{ProgramaAcademico} ---relación de composición uno a muchos---
+refleja la realidad normativa: los programas reforman sus planes de estudios
+periódicamente, pero los estudiantes que iniciaron bajo un plan anterior
+conservan el derecho a terminarlo bajo las condiciones originales. El sistema
+debe mantener el histórico de versiones y asociar cada estudiante a la versión
+del plan bajo la cual se matriculó.
+
+\subsection{Modelo de evaluación, -PFA- y rúbricas}
+\label{subsec:modelo-evaluacion}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Modelo de evaluación, rúbricas y evidencias (PlantUML).},
+  label={lst:plantuml-clases-eval}]
+@startuml clases_evaluacion
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam classBackgroundColor #F8F8FF
+skinparam classBorderColor #00467F
+skinparam ArrowColor #00467F
+
+class Rubrica {
+  - nombre : String
+  - descripcion : String
+  - version : String
+  - ponderacionTotal : double
+  + getNombre() : String
+  + getCriterios() : List<Criterio>
+  + calcularCalificacion(niveles : Map<Criterio, NivelDesempeno>) : double
+}
+
+class Criterio {
+  - nombre : String
+  - descripcion : String
+  - ponderacion : double
+  + getNombre() : String
+  + getPonderacion() : double
+  + getNivelesDesempeno() : List<NivelDesempeno>
+}
+
+class NivelDesempeno {
+  - nombre : String
+  - descripcion : String
+  - valorNumerico : double
+  + getNombre() : String
+  + getValorNumerico() : double
+}
+
+class Evidencia {
+  - titulo : String
+  - descripcion : String
+  - tipo : TipoEvidencia
+  - fechaRegistro : LocalDateTime
+  - archivoRuta : String
+  - docente : Docente
+  - estudiante : Estudiante
+  + getTitulo() : String
+  + getFechaRegistro() : LocalDateTime
+  + getCriteriosEvaluados() : List<CriterioEvaluado>
+}
+
+class CriterioEvaluado {
+  - criterio : Criterio
+  - nivelObtenido : NivelDesempeno
+  - comentario : String
+  + getCalificacionPonderada() : double
+}
+
+class Calificacion {
+  - valor : double
+  - escala : String
+  - fecha : LocalDate
+  - periodo : String
+  + getValor() : double
+  + esAprobatorio() : boolean
+}
+
+class ActividadFormativa {
+  - nombre : String
+  - descripcion : String
+  - tipo : TipoActividad
+  - porcentaje : double
+  + getNombre() : String
+  + getPorcentaje() : double
+}
+
+enum TipoEvidencia {
+  TRABAJO_ESCRITO
+  PRESENTACION
+  PROYECTO
+  EXAMEN
+  PARTICIPACION
+  OTRO
+}
+
+enum TipoActividad {
+  TALLER
+  PROYECTO
+  EXAMEN
+  EXPOSICION
+  PRACTICA
+  INVESTIGACION
+}
+
+Rubrica "1" *-- "1..*" Criterio : contiene
+Criterio "1" *-- "2..4" NivelDesempeno : define
+Evidencia "1" *-- "1..*" CriterioEvaluado : registra
+CriterioEvaluado --> Criterio
+CriterioEvaluado --> NivelDesempeno
+Evidencia --> Docente : registrada por
+Evidencia --> Estudiante : evaluado
+EspacioAcademico "1" --> "1..*" Rubrica : emplea
+EspacioAcademico "1" --> "0..*" ActividadFormativa : incluye
+Evidencia "1" --> "1" Calificacion : genera
+Evidencia --> TipoEvidencia
+ActividadFormativa --> TipoActividad
+
+@enduml
+\end{lstlisting}
+
+\textbf{Justificación.} La separación entre \texttt{Rubrica},
+\texttt{Criterio} y \texttt{NivelDesempeno} modela la estructura real
+de las rúbricas de evaluación: una rúbrica tiene varios criterios, y
+cada criterio tiene entre dos y cuatro niveles de desempeño que varían
+en descripción y valor numérico. La clase \texttt{CriterioEvaluado} es
+una clase asociativa que registra, para cada evidencia concreta, qué nivel
+de desempeño obtuvo el estudiante en cada criterio. Este diseño permite
+recalcular la calificación en cualquier momento a partir de los registros
+originales y mantiene la trazabilidad completa del proceso evaluativo.
+
+%% ─────────────────────────────────────────────
+\section{Diagramas de secuencia representativos}
+\label{sec:secuencia}
+%% ─────────────────────────────────────────────
+
+Los diagramas de secuencia modelan la interacción dinámica entre objetos
+del dominio en los flujos de mayor relevancia. Se presentan dos: la
+matrícula de un estudiante y la evaluación con rúbrica. Cada diagrama
+se acompaña de una descripción de las responsabilidades asignadas a
+cada participante.
+
+\subsection*{Secuencia: Matricular Estudiante}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de secuencia: matricular estudiante (PlantUML).},
+  label={lst:plantuml-seq-matricula}]
+@startuml seq_matricula
+skinparam sequenceArrowColor #00467F
+skinparam participantBackgroundColor #F0F4FF
+skinparam participantBorderColor #00467F
+skinparam lifelineBorderColor #00467F
+
+actor "Personal\nAdministrativo" as admin
+participant "SistemaMatricula\n:ControladorMatricula" as ctrl
+participant ":Estudiante" as est
+participant ":ProgramaAcademico" as prog
+participant ":Matricula" as mat
+participant ":RepositorioMatricula" as repo
+
+admin -> ctrl : registrarMatricula(datosEstudiante, codigoProg, periodo)
+activate ctrl
+
+ctrl -> prog : verificarCuposDisponibles(periodo)
+activate prog
+prog --> ctrl : cuposDisponibles : boolean
+deactivate prog
+
+alt cuposDisponibles == true
+  ctrl -> est : create(datosEstudiante)
+  activate est
+  est --> ctrl : estudiante : Estudiante
+  deactivate est
+
+  ctrl -> mat : create(estudiante, programa, periodo)
+  activate mat
+  mat --> ctrl : matricula : Matricula
+  deactivate mat
+
+  ctrl -> repo : guardar(matricula)
+  activate repo
+  repo --> ctrl : confirmacion : boolean
+  deactivate repo
+
+  ctrl -> prog : reducirCupo(periodo)
+  activate prog
+  prog --> ctrl : ok
+  deactivate prog
+
+  ctrl --> admin : matriculaRegistrada(matricula.getCodigo())
+else cuposDisponibles == false
+  ctrl --> admin : error("Sin cupos disponibles en el periodo")
+end
+
+deactivate ctrl
+@enduml
+\end{lstlisting}
+
+El controlador \texttt{ControladorMatricula} concentra la lógica de
+orquestación: verifica cupos, crea los objetos de dominio, persiste la
+matrícula y actualiza el estado del programa. La separación entre el
+controlador y las clases de dominio respeta el principio de responsabilidad
+única (\textit{Single Responsibility Principle}): las clases de dominio
+modelan conceptos del negocio, no lógica de transacción.
+
+\subsection*{Secuencia: Evaluar con Rúbrica}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de secuencia: registrar evidencia y evaluar con
+    rúbrica (PlantUML).},
+  label={lst:plantuml-seq-rubrica}]
+@startuml seq_rubrica
+skinparam sequenceArrowColor #00467F
+skinparam participantBackgroundColor #F0F4FF
+skinparam participantBorderColor #00467F
+
+actor "Docente" as docente
+participant "ControladorEvaluacion" as ctrl
+participant ":EspacioAcademico" as espacio
+participant ":Rubrica" as rubrica
+participant ":Evidencia" as evid
+participant ":Calificacion" as cal
+participant ":RepositorioEvaluacion" as repo
+
+docente -> ctrl : iniciarEvaluacion(idEspacio, idEstudiante)
+activate ctrl
+
+ctrl -> espacio : getRubricas()
+activate espacio
+espacio --> ctrl : List<Rubrica>
+deactivate espacio
+
+ctrl --> docente : presentarRubricas(List<Rubrica>)
+
+docente -> ctrl : seleccionarRubrica(idRubrica)
+ctrl -> rubrica : getCriterios()
+activate rubrica
+rubrica --> ctrl : List<Criterio>
+deactivate rubrica
+
+ctrl --> docente : presentarCriterios(List<Criterio>)
+
+docente -> ctrl : registrarNiveles(Map<Criterio, NivelDesempeno>, archivo)
+ctrl -> evid : create(docente, estudiante, rubrica, nivelesObtenidos, archivo)
+activate evid
+evid --> ctrl : evidencia : Evidencia
+deactivate evid
+
+ctrl -> rubrica : calcularCalificacion(nivelesObtenidos)
+activate rubrica
+rubrica --> ctrl : valorCalificacion : double
+deactivate rubrica
+
+ctrl -> cal : create(valorCalificacion, periodo)
+activate cal
+cal --> ctrl : calificacion : Calificacion
+deactivate cal
+
+ctrl -> repo : guardar(evidencia, calificacion)
+activate repo
+repo --> ctrl : confirmacion
+deactivate repo
+
+ctrl --> docente : evaluacionRegistrada(calificacion.getValor())
+deactivate ctrl
+@enduml
+\end{lstlisting}
+
+La secuencia de evaluación con rúbrica evidencia la ventaja del diseño
+encapsulado: el docente no necesita conocer el algoritmo de cálculo de
+la calificación ---ese conocimiento está en \texttt{Rubrica.calcularCalificacion()}---
+ni los detalles de persistencia ---responsabilidad del repositorio---. Solo
+provee los datos que le corresponden como actor del proceso.
+
+%% ─────────────────────────────────────────────
+\section{Diagramas de estado para procesos clave}
+\label{sec:estados}
+%% ─────────────────────────────────────────────
+
+Los diagramas de estado modelan el ciclo de vida de las entidades del
+dominio con mayor variación de estado. Dos resultan determinantes para
+el sistema de información de la \ud: el ciclo de vida del
+\texttt{Estudiante} y el del \texttt{ProgramaAcademico}.
+
+\subsection*{Estado: Ciclo de vida del Estudiante}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de estado: ciclo de vida del \texttt{Estudiante}
+    (PlantUML).},
+  label={lst:plantuml-estado-estudiante}]
+@startuml estado_estudiante
+skinparam stateBackgroundColor #F0F4FF
+skinparam stateBorderColor #00467F
+skinparam arrowColor #00467F
+
+[*] --> Aspirante : Solicitud de admisión
+
+Aspirante --> Admitido : Aprobación del proceso de admisión
+Aspirante --> [*] : Rechazo o desistimiento
+
+Admitido --> Activo : Pago de matrícula y\nregistro académico
+Admitido --> [*] : No pago en plazo establecido
+
+Activo --> Suspension : Sanción disciplinaria\no abandono por período
+Activo --> EnProcesodeGrado : Aprobación de todos\nlos créditos requeridos
+Activo --> Retirado : Retiro voluntario\no definitivo
+Activo --> Activo : Renovación de matrícula\npor período
+
+Suspension --> Activo : Levantamiento de sanción\no reingreso aprobado
+Suspension --> Retirado : Vencimiento del plazo\nde reingreso
+
+EnProcesodeGrado --> Graduado : Grado conferido en\nceremonia oficial
+EnProcesodeGrado --> Activo : Pendiente de requisitos\nde grado
+
+Retirado --> [*] : Estado terminal
+Graduado --> [*] : Estado terminal\n(pasa a Egresado)
+
+state "En Proceso de Grado" as EnProcesodeGrado
+@enduml
+\end{lstlisting}
+
+Los estados \texttt{Graduado} y \texttt{Retirado} son terminales: una vez
+que un estudiante alcanza cualquiera de ellos, no puede regresar al estado
+\texttt{Activo}. Esta restricción debe reflejarse en el código mediante
+una excepción de dominio ---por ejemplo, \texttt{TransicionEstadoInvalidaException}---
+que impida la transición ilegal. El patrón \textit{State} \cite{Gamma1994}
+es el candidato natural para implementar este comportamiento en \java.\footnote{%
+  En \rust\, el patrón \textit{State} se puede implementar mediante enumerados
+  con variantes que llevan datos (\textit{enums with data}), lo que resulta
+  más expresivo que la solución basada en interfaces de \java. La comparación
+  detallada se desarrolla en el Capítulo correspondiente a la implementación
+  en \rust.}
+
+\subsection*{Estado: Ciclo de vida del Programa Académico}
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de estado: ciclo de vida del \texttt{ProgramaAcademico}
+    (PlantUML).},
+  label={lst:plantuml-estado-programa}]
+@startuml estado_programa
+skinparam stateBackgroundColor #F0F4FF
+skinparam stateBorderColor #00467F
+skinparam arrowColor #00467F
+
+[*] --> EnDiseno : Decisión del Consejo de Facultad\nde crear el programa
+
+EnDiseno --> EnTramite : Radicación del documento\nante el Consejo Académico
+EnDiseno --> EnDiseno : Revisión y ajuste\ndel PEP
+
+EnTramite --> RegistroCalificado : Resolución del MEN\notorgando registro
+EnTramite --> EnDiseno : Concepto desfavorable;\nse requieren ajustes
+
+RegistroCalificado --> Activo : Apertura de primera\ncohorte con matriculados
+RegistroCalificado --> Cerrado : Decisión institucional\nde no abrir cohortes
+
+Activo --> EnRenovacion : Inicio del proceso de\nrenovación del registro calificado
+Activo --> Cerrado : Decisión del Consejo Superior\nde cerrar el programa
+
+EnRenovacion --> Activo : Nueva resolución MEN\notorgando renovación
+EnRenovacion --> Cerrado : No renovación;\nse inicia proceso de cierre
+
+Cerrado --> [*] : Estado terminal
+
+state "Registro Calificado" as RegistroCalificado
+state "En Renovacion" as EnRenovacion
+state "En Tramite" as EnTramite
+@enduml
+\end{lstlisting}
+
+El ciclo de vida del \texttt{ProgramaAcademico} refleja la normativa del
+Decreto~1330 de 2019 \autocite{Decreto1330_2019}: un programa no puede
+tener estudiantes matriculados sin registro calificado vigente. El sistema
+debe validar esta restricción al intentar matricular un estudiante en un
+programa en estado \texttt{EnDiseno}, \texttt{EnTramite} o \texttt{Cerrado}.
+La restricción es un invariante del dominio que el sistema de información
+debe hacer cumplir.
+
+%% ─────────────────────────────────────────────
+\section{Comparativa \java\ vs.\ \rust: expresividad en modelado de dominio}
+\label{sec:java-rust-uml}
+%% ─────────────────────────────────────────────
+
+La traducción de los diagramas de clases del dominio a código difiere
+de manera notable entre \java\ y \rust. Tres aspectos ilustran el contraste.
+
+\textbf{Clases abstractas.} La clase \texttt{UnidadAcademica} se mapea
+directamente a \texttt{abstract class} en \java. En \rust\ no existe
+el concepto de clase abstracta; la solución sintática es definir un
+\textit{trait} \texttt{UnidadAcademica} con los métodos comunes e implementarlo
+en cada \textit{struct} (\texttt{Facultad}, \texttt{Escuela}, etc.)
+\autocite{Klabnik2023}. El \textit{trait} resulta más flexible ---permite
+implementación múltiple, ausente en \java--- pero menos expresivo para
+el concepto de herencia de datos: los atributos comunes deben duplicarse
+en cada \textit{struct} o gestionarse mediante composición.
+
+\textbf{Enumerados con datos.} El enumerado \texttt{EstadoEstudiante}
+se modela en \java\ como un \texttt{enum} simple con constantes. En \rust\,
+los enumerados pueden llevar datos en sus variantes, lo que permite
+modelar estados con transiciones condicionadas por datos concretos ---por
+ejemplo, la variante \texttt{EnProcesodeGrado\{fechaInicio: NaiveDate\}}
+que registra la fecha en que comenzó el proceso de grado. Esta capacidad
+hace que el patrón \textit{State} sea más natural en \rust\ que en \java.
+
+\textbf{Relaciones de composición y propiedad.} La relación de composición
+entre \texttt{PlanDeEstudios} y \texttt{EspacioAcademico} ---en la que el
+plan es propietario del espacio y el espacio no tiene existencia independiente---
+se expresa en \rust\ de forma directa mediante el sistema de \textit{ownership}:
+\texttt{struct PlanDeEstudios \{ espacios: Vec<EspacioAcademico> \}} indica
+que el \textit{struct} posee los espacios. En \java\, la misma semántica
+debe documentarse mediante comentarios o convenciones de uso, puesto que
+el lenguaje no distingue a nivel de tipos entre composición y agregación.
+
+%% ─────────────────────────────────────────────
+%% SPRINT 4
+%% ─────────────────────────────────────────────
+\section*{Sprint 4: Modelo de dominio inicial}
+\label{sprint:4}
+\addcontentsline{toc}{section}{Sprint 4: Modelo de dominio inicial}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 4 — Modelo de dominio inicial}]
+  \textbf{Duración estimada:} 1 semana\\
+  \textbf{Objetivo:} Construir el diagrama de clases del dominio para los
+  subsistemas organizacional y de actores institucionales, empleando
+  \plantuml\ y sustentando cada decisión de diseño en los requisitos
+  derivados del \acuerdo.\\
+  \textbf{Entregables:} (1) Diagrama de clases subsistema organizacional;
+  (2) Diagrama de clases subsistema actores; (3) Documento de justificación
+  de decisiones de diseño.
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Tabla del Sprint 4}
+
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4.5cm}}
+  \sprintcabecera
+  \endhead
+  \bottomrule
+  \caption{Entregables, características del programa y criterios de la
+    rúbrica del Sprint 4.}
+  \label{tab:sprint4}
+  \endlastfoot
+  Diagrama de clases del subsistema organizacional en \plantuml\
+  (mínimo 8 clases con atributos, métodos y enumerados; relaciones
+  de herencia, composición y asociación etiquetadas)
+  & Aplicar los principios de abstracción, encapsulamiento y herencia
+    al modelado de la jerarquía de unidades académicas; usar \plantuml\
+    como herramienta de modelado versionable
+  & El diagrama es coherente con el \acuerdo; las decisiones de herencia,
+    composición y asociación se justifican mediante argumentación
+    orientada a objetos con referencia a los artículos del estatuto;
+    la sintaxis \plantuml\ es correcta y el diagrama compila \\
+  \midrule
+  Diagrama de clases del subsistema de actores en \plantuml\
+  (mínimo 5 clases, incluyendo clase abstracta y enumerados de tipo
+  de vinculación y estado)
+  & Modelar la diversidad de actores institucionales mediante herencia
+    y polimorfismo; justificar la decisión de enumerado vs.\ jerarquía
+    de subclases para los tipos de docente
+  & El diagrama distingue correctamente herencia de composición; los
+    atributos de cada subclase son coherentes con el estatuto; la
+    justificación de la decisión de diseño para \texttt{TipoDocente}
+    está argumentada \\
+  \midrule
+  Documento de justificación de decisiones de diseño (mínimo 3 páginas)
+  & Comunicar por escrito las decisiones de modelado, con argumentación
+    orientada a objetos y referencia normativa; desarrollar la práctica
+    de documentación de diseño
+  & El documento justifica al menos 5 decisiones de diseño concretas
+    con argumentación técnica y normativa; el vocabulario es coherente
+    con los conceptos de -POO- desarrollados en el capítulo~1 \\
+  \midrule
+  Comparación con el modelo generado por asistente computacional
+  (análisis crítico según el marco de 4 categorías)
+  & Desarrollar pensamiento crítico sistemático frente al diseño
+    orientado a objetos generado automáticamente
+  & El análisis identifica al menos 3 diferencias conceptuales
+    significativas; se aplican las categorías C1--C4 del marco de
+    análisis; la argumentación está referenciada al dominio
+    institucional \\
+\end{longtable}
+
+\subsection*{Actividad de reflexión: software generativo y modelado -UML-}
+\label{act:ia-sprint4}
+
+\begin{tcolorbox}[actividadIA,
+  title={Actividad de reflexión (Sprint~4) —
+         Software generativo y modelado -UML-}]
+
+\textbf{Instrucción general.}
+El estudiante elabora el diagrama de clases del subsistema organizacional
+de manera individual, sin asistencia computacional. A continuación, solicita
+al asistente generativo que genere un diagrama equivalente a partir de una
+descripción en lenguaje natural del \acuerdo\ (proporcionada como contexto).
+Se comparan las dos propuestas mediante el marco de análisis crítico.
+
+\bigskip
+\textbf{Preguntas orientadoras:}
+\begin{enumerate}[label=\arabic*.]
+  \item ¿El asistente genera código \plantuml\ sintácticamente correcto
+        que compila sin errores? Si hay errores, identifíquelos y explique
+        su probable causa.
+  \item ¿El asistente distingue correctamente entre herencia y composición
+        en el dominio institucional? Proporcione al menos un ejemplo concreto
+        de error o imprecisión conceptual.
+  \item ¿El asistente captura la restricción del \acuerdo\ según la cual
+        todos los docentes están adscritos a una Escuela ---no a una
+        Facultad---? Si no la captura, ¿cómo reformularía el \textit{prompt}
+        para obtener un modelo más preciso?
+  \item ¿El diagrama del asistente incluye enumerados para los estados
+        y tipos? ¿Son coherentes con los valores definidos en el estatuto?
+\end{enumerate}
+
+\bigskip
+\textbf{Rúbrica breve:}
+\begin{itemize}
+  \item \textbf{Producto} (60\%): corrección técnica del diagrama propio,
+        coherencia con el \acuerdo, justificación de decisiones de diseño,
+        compilación exitosa del código \plantuml.
+  \item \textbf{Proceso} (40\%): calidad del análisis comparativo,
+        identificación de errores conceptuales del asistente con
+        argumentación normativa específica, reflexión sobre la mejora
+        iterativa del \textit{prompt}.
+\end{itemize}
+
+\end{tcolorbox}
+
+%% ─────────────────────────────────────────────
+%% SPRINT 5
+%% ─────────────────────────────────────────────
+\section*{Sprint 5: Casos de uso ampliados y diagramas de secuencia}
+\label{sprint:5}
+\addcontentsline{toc}{section}{Sprint 5: Casos de uso ampliados y diagramas
+  de secuencia}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 5 — Casos de uso ampliados y
+  diagramas de secuencia}]
+  \textbf{Duración estimada:} 1 semana\\
+  \textbf{Objetivo:} Ampliar el diagrama de casos de uso a los tres
+  subsistemas, especificar los flujos principal y alternativo de los
+  casos de uso prioritarios, construir los diagramas de secuencia para
+  los flujos principales y modelar el ciclo de vida de las entidades
+  con estados.\\
+  \textbf{Entregables:} (1) Diagramas CU completos (3 subsistemas);
+  (2) Especificaciones textuales de 3 CU; (3) Diagramas de secuencia
+  (matrícula + evaluación); (4) Diagramas de estado (Estudiante +
+  ProgramaAcademico).
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Tabla del Sprint 5}
+
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4.5cm}}
+  \sprintcabecera
+  \endhead
+  \bottomrule
+  \caption{Entregables, características del programa y criterios de la
+    rúbrica del Sprint 5.}
+  \label{tab:sprint5}
+  \endlastfoot
+  Diagramas de casos de uso completos en \plantuml\ para los tres
+  subsistemas (organizacional, académico, evaluación), con relaciones
+  \textit{include} y \textit{extend} correctas
+  & Modelar el comportamiento del sistema desde la perspectiva de todos
+    los actores institucionales definidos en el \acuerdo; usar relaciones
+    \textit{include/extend} apropiadamente
+  & El diagrama cubre los tres subsistemas; los actores corresponden
+    a los definidos en el \acuerdo; las relaciones \textit{include/extend}
+    son semánticamente correctas; la sintaxis \plantuml\ es válida \\
+  \midrule
+  Especificaciones textuales de 3 casos de uso prioritarios
+  (actor principal, precondición, flujo principal, flujos alternativos,
+  postcondición; formato tabla)
+  & Especificar de manera precisa el comportamiento esperado del sistema
+    para los flujos de mayor complejidad
+  & Las especificaciones son completas; los flujos alternativos cubren
+    los escenarios de error más probables; la especificación es
+    verificable y coherente con los -RF- del Sprint~2 \\
+  \midrule
+  Diagramas de secuencia en \plantuml\ para «Matricular Estudiante»
+  y «Evaluar con Rúbrica» (con controlador, objetos de dominio y
+  repositorios)
+  & Modelar la interacción dinámica entre objetos del dominio;
+    aplicar el patrón Controlador para separar la lógica de orquestación
+    de las clases de dominio
+  & Los diagramas reflejan fielmente el flujo del proceso; los mensajes
+    corresponden a métodos reales de las clases del diagrama de dominio
+    del Sprint~4; la separación controlador/dominio es clara \\
+  \midrule
+  Diagramas de estado para «Ciclo de vida del Estudiante» y «Ciclo
+  de vida del Programa Académico» en \plantuml\
+  & Modelar los estados y transiciones de las entidades del dominio
+    con mayor variación de estado; identificar los invariantes de
+    transición que el sistema debe hacer cumplir
+  & Los diagramas son coherentes con el \acuerdo\ y el Decreto~1330
+    de 2019; los estados terminales son correctos; las restricciones
+    de transición están identificadas y justificadas \\
+\end{longtable}
+
+\subsection*{Actividad de reflexión: software generativo y diagramas de secuencia}
+\label{act:ia-sprint5}
+
+\begin{tcolorbox}[actividadIA,
+  title={Actividad de reflexión (Sprint~5) —
+         Software generativo y diagramas de secuencia}]
+
+\textbf{Instrucción general.}
+El estudiante construye el diagrama de secuencia para el caso de uso
+«Matricular Estudiante» de manera individual, basándose en el modelo
+de clases del Sprint~4 y los requisitos del Sprint~2. A continuación,
+solicita al asistente generativo que genere el mismo diagrama, proporcionando
+como contexto la especificación del caso de uso y las clases del dominio.
+Se evalúa la coherencia de los mensajes generados con el modelo de clases.
+
+\bigskip
+\textbf{Preguntas orientadoras:}
+\begin{enumerate}[label=\arabic*.]
+  \item ¿Los mensajes del diagrama generado por el asistente corresponden
+        a métodos reales de las clases del modelo de dominio del Sprint~4?
+        Identifique al menos dos mensajes inventados o incoherentes con
+        el modelo.
+  \item ¿El asistente incorpora un controlador u objeto de servicio para
+        orquestar la secuencia, o modela la lógica de orquestación dentro
+        de las clases de dominio? ¿Cuál de las dos opciones es más coherente
+        con el principio de responsabilidad única?
+  \item ¿El asistente modela el flujo alternativo en que no hay cupos
+        disponibles? Si no lo hace, ¿cómo reformularía el \textit{prompt}
+        para obtener el diagrama completo?
+  \item ¿El diagrama generado por el asistente es sintácticamente correcto
+        en \plantuml\ y compila sin errores?
+\end{enumerate}
+
+\bigskip
+\textbf{Rúbrica breve:}
+\begin{itemize}
+  \item \textbf{Producto} (60\%): coherencia del diagrama propio con el
+        modelo de clases del Sprint~4, corrección de la secuencia de
+        mensajes, inclusión del flujo alternativo, compilación exitosa
+        del código \plantuml.
+  \item \textbf{Proceso} (40\%): profundidad del análisis crítico del
+        diagrama del asistente, identificación argumentada de
+        inconsistencias conceptuales, reflexión sobre el valor del
+        proceso de diseño manual frente al generado automáticamente.
+\end{itemize}
+
+\end{tcolorbox}

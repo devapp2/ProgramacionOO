@@ -1,0 +1,2259 @@
+%% ============================================================
+%% cap06.tex — Capítulo 6
+%% Pruebas, calidad y refactorización
+%% Sprints 10 y 11
+%%
+%% Autor: Roberto Albeiro Pava-Díaz, Ph.D.
+%% ORCID: 0000-0003-0440-892X
+%% Universidad Distrital Francisco José de Caldas
+%% Versión 2026 — Fase 2 completa
+%% ============================================================
+
+\chapter{Pruebas, calidad y refactorización}
+\label{cap:pruebas}
+
+\noindent
+Un sistema de información que implementa estatutos universitarios debe ser no solo funcional,
+sino correcto: las invariantes del dominio ---que una Escuela no puede existir sin Facultad,
+que un Estudiante matriculado en un programa tiene exactamente un plan de estudios activo,
+que los tipos de docente son los cinco definidos en el artículo~8 del \acuerdo--- no son
+sugerencias de diseño; son restricciones con consecuencias normativas. La diferencia entre
+un sistema que «parece funcionar» y uno que \emph{puede demostrarse} que funciona reside,
+casi por completo, en la existencia de una batería de pruebas automatizadas que se ejecuta
+en cada integración del código.
+
+Queda abierta, sin embargo, la pregunta de cuántas pruebas son suficientes. La cobertura del
+100~\% de líneas no garantiza la ausencia de errores lógicos; tampoco el cumplimiento de todas
+las aserciones de dominio garantiza que el sistema responda correctamente ante interacciones
+inesperadas del usuario. Esa tensión irreducible es una de las razones por las cuales la
+prueba automatizada se trata, en este capítulo, no como un fin en sí mismo, sino como parte
+de un ciclo más amplio que incluye métricas de calidad, refactorización continua y
+documentación acuciosa.\footnote{En la Facultad de Ingeniería de la \ud, el autor ha
+observado ---entre 2019 y 2025, en las asignaturas Programación Orientada a Objetos y
+Patrones de Diseño de Software--- que los estudiantes que escriben pruebas \emph{antes}
+de implementar la funcionalidad (TDD) producen código con menor acoplamiento y mayor
+cohesión, aunque la diferencia se percibe con claridad solo a partir del tercer sprint
+del proyecto.}
+
+Este capítulo cubre los Sprints~10 y~11. El primero se orienta a la construcción de la
+batería de pruebas unitarias para el dominio; el segundo, a la refactorización fundamentada
+en los principios SOLID \parencite{Martin2017} y en el catálogo de técnicas de Fowler
+\parencite{Fowler2018}. Ambos sprints se apoyan en las clases del paquete
+\texttt{co.edu.udistrital.estatuto.modelo} implementadas en el Capítulo~\ref{cap:java}
+y en los \textit{structs} del módulo \texttt{modelo} de la implementación en \rust\
+del Capítulo~\ref{cap:rust}.
+
+
+%% ─────────────────────────────────────────────
+\section{Pruebas unitarias en \java\ (JUnit~5)}
+\label{sec:pruebas-java}
+%% ─────────────────────────────────────────────
+
+\subsection{Arquitectura de JUnit~5}
+\label{subsec:junit5-arquitectura}
+
+JUnit~5 no es una biblioteca monolítica, sino una plataforma compuesta por tres módulos
+con responsabilidades bien delimitadas, lo que permite su extensión sin modificar el núcleo.
+La tabla~\ref{tab:junit5-arquitectura} resume los componentes y sus funciones.
+
+\begingroup
+\small
+\begin{longtable}{@{} L{3.5cm} L{4cm} L{6.5cm} @{} }
+	% --- Título y encabezado de la primera página ---
+	\caption{Componentes de la plataforma JUnit~5.} \label{tab:junit5-arquitectura} \\
+	\toprule
+	\textbf{Módulo} & \textbf{Función principal} & \textbf{Notas} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Módulo} & \textbf{Función principal} & \textbf{Notas} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	\texttt{JUnit Platform} &
+	Motor de descubrimiento y ejecución &
+	Define la API \texttt{TestEngine}; soporta múltiples \textit{frameworks} sobre una sola plataforma \\
+	\midrule
+	
+	\texttt{JUnit Jupiter} &
+	API de escritura de pruebas y extensiones &
+	Introduce anotaciones modernas como \texttt{@Test}, \texttt{@BeforeEach}, \texttt{@Nested} y \texttt{@ParameterizedTest} \\
+	\midrule
+	
+	\texttt{JUnit Vintage} &
+	Compatibilidad con versiones anteriores &
+	Permite ejecutar suites heredadas (JUnit~3 y 4) junto con pruebas Jupiter sin migración forzosa \\
+\end{longtable}
+\endgroup
+
+Las anotaciones más relevantes para el proyecto del estatuto se listan a continuación.
+No es descartable que en versiones subsecuentes de JUnit~5 se incorporen nuevas anotaciones
+---al momento de redactar este capítulo (marzo de 2026), la versión estable es JUnit~5.10---,
+pero las aquí descritas conforman el repertorio estable desde la versión~5.5:
+
+\begin{itemize}
+  \item \texttt{@Test}: marca un método como caso de prueba individual.
+  \item \texttt{@BeforeEach} / \texttt{@AfterEach}: ejecutan código de preparación y limpieza
+        antes y después de \emph{cada} prueba; análogos a \texttt{setUp()} y \texttt{tearDown()}
+        de JUnit~4, pero sin herencia obligatoria.
+  \item \texttt{@BeforeAll} / \texttt{@AfterAll}: ejecutados una sola vez por clase de prueba;
+        deben ser métodos \texttt{static} salvo que la clase esté anotada con
+        \texttt{@TestInstance(Lifecycle.PER\_CLASS)}.
+  \item \texttt{@DisplayName}: permite nombrar el caso de prueba con texto libre, incluidos
+        caracteres especiales y espacios, lo que mejora la legibilidad de los reportes.
+  \item \texttt{@Nested}: agrupa pruebas relacionadas en clases internas no estáticas; permite
+        una jerarquía de contextos de prueba que refleja la lógica del dominio.
+  \item \texttt{@ParameterizedTest} con \texttt{@ValueSource}, \texttt{@CsvSource} o
+        \texttt{@MethodSource}: ejecuta el mismo caso de prueba con múltiples conjuntos de
+        entrada, reduciendo la duplicación.
+  \item \texttt{@Tag}: clasifica las pruebas para filtrado selectivo durante la ejecución.
+  \item \texttt{@Disabled}: excluye temporalmente una prueba, con obligación de documentar
+        la razón ---práctica que el autor recomienda imponer como parte de la rúbrica.
+\end{itemize}
+
+\subsection{Integración con Maven Surefire}
+\label{subsec:maven-surefire}
+
+La ejecución automática de la batería de pruebas se configura mediante el complemento
+Maven Surefire. El fragmento del Listado~\ref{lst:surefire-config} muestra la configuración
+mínima adoptada para el proyecto:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Configuración de Maven Surefire para JUnit~5 en \texttt{pom.xml}.},
+  label={lst:surefire-config},
+  language=XML]
+<build>
+  <plugins>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-surefire-plugin</artifactId>
+      <version>3.2.5</version>
+      <configuration>
+        <!-- Excluir pruebas de integracion marcadas con @Tag -->
+        <excludedGroups>integracion</excludedGroups>
+        <!-- Habilitar reporte en formato XML para SonarQube -->
+        <reportFormat>xml</reportFormat>
+        <!-- Mostrar nombres completos de pruebas fallidas -->
+        <useFile>false</useFile>
+      </configuration>
+    </plugin>
+  </plugins>
+</build>
+\end{lstlisting}
+
+\noindent
+Con esta configuración, el comando \texttt{mvn test} ejecuta todas las pruebas anotadas con
+\texttt{@Test} y \texttt{@ParameterizedTest} que no pertenezcan al grupo \texttt{integracion}.
+Los reportes XML generados en \texttt{target/surefire-reports/} son consumidos por SonarQube
+para el análisis de cobertura y calidad (véase la sección~\ref{sec:cobertura}).
+
+\subsection{Prueba unitaria de \texttt{Facultad}}
+\label{subsec:prueba-facultad}
+
+La clase \texttt{Facultad} es la raíz de la jerarquía organizacional del sistema.
+Toda vez que el \acuerdo\ establece que toda unidad académica debe tener un código
+institucional no nulo, que la Facultad contiene al menos una Escuela y que su director
+debe ser designado formalmente, las pruebas han de verificar esas tres restricciones
+de dominio con carácter prioritario. El Listado~\ref{lst:junit-facultad} muestra la
+clase de prueba completa, incluyendo casos parametrizados y verificación de excepciones:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Clase de prueba \texttt{FacultadTest} con JUnit~5.},
+  label={lst:junit-facultad}]
+package co.edu.udistrital.estatuto.modelo;
+
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
+import static org.junit.jupiter.api.Assertions.*;
+import java.time.LocalDate;
+
+@DisplayName("Pruebas unitarias: Facultad")
+class FacultadTest {
+
+    private Facultad facultad;
+
+    @BeforeEach
+    void setUp() {
+        facultad = new Facultad(
+            "Facultad de Ingenieria",
+            "FI-001",
+            LocalDate.of(1948, 7, 20),
+            "Decano de Prueba"
+        );
+    }
+
+    @Test
+    @DisplayName("getTipo() retorna 'Facultad'")
+    void getTipoRetornaFacultad() {
+        assertEquals("Facultad", facultad.getTipo(),
+            "El tipo debe ser la cadena 'Facultad' segun el dominio");
+    }
+
+    @Test
+    @DisplayName("Constructor: codigo nulo lanza IllegalArgumentException")
+    void constructorCodigoNuloLanzaExcepcion() {
+        assertThrows(IllegalArgumentException.class, () ->
+            new Facultad(
+                "Facultad de Tecnologia",
+                null,                        // codigo nulo
+                LocalDate.now(),
+                "Decano"
+            ),
+            "Se esperaba IllegalArgumentException para codigo nulo"
+        );
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  ", "\t", "\n"})
+    @DisplayName("Constructor: codigo nulo o en blanco siempre lanza excepcion")
+    void constructorCodigoInvalidoLanzaExcepcion(String codigoInvalido) {
+        assertThrows(IllegalArgumentException.class, () ->
+            new Facultad("Facultad X", codigoInvalido,
+                         LocalDate.now(), "Director")
+        );
+    }
+
+    @Test
+    @DisplayName("addEscuela: agregar escuela incrementa la lista")
+    void addEscuelaIncrementaLista() {
+        Escuela esc = new Escuela(
+            "Ingenieria de Sistemas",
+            "IS-001",
+            LocalDate.of(1994, 3, 1),
+            "Director Sistemas",
+            facultad
+        );
+        facultad.addEscuela(esc);
+        assertEquals(1, facultad.getEscuelas().size());
+        assertTrue(facultad.getEscuelas().contains(esc));
+    }
+
+    @Test
+    @DisplayName("addEscuela: escuela nula lanza NullPointerException")
+    void addEscuelaNulaLanzaExcepcion() {
+        assertThrows(NullPointerException.class,
+            () -> facultad.addEscuela(null));
+    }
+
+    @Test
+    @DisplayName("getCodigo: el codigo se normaliza a mayusculas")
+    void getCodigoNormalizadoMayusculas() {
+        Facultad f = new Facultad("Tecnologia", "fi-002",
+                                   LocalDate.now(), "Director");
+        assertEquals("FI-002", f.getCodigo());
+    }
+
+    @Test
+    @DisplayName("getFechaCreacion: devuelve la fecha pasada en el constructor")
+    void getFechaCreacionCorrecta() {
+        LocalDate esperada = LocalDate.of(1948, 7, 20);
+        assertEquals(esperada, facultad.getFechaCreacion());
+    }
+
+    @Nested
+    @DisplayName("Pruebas de igualdad y representacion")
+    class IgualdadYRepresentacion {
+
+        @Test
+        @DisplayName("equals: dos facultades con mismo codigo son iguales")
+        void equalsMismoCodigoSonIguales() {
+            Facultad f2 = new Facultad("Nombre distinto", "FI-001",
+                                        LocalDate.now(), "Otro director");
+            assertEquals(facultad, f2,
+                "La igualdad debe basarse en el codigo institucional");
+        }
+
+        @Test
+        @DisplayName("toString: contiene nombre y codigo")
+        void toStringContieneNombreYCodigo() {
+            String repr = facultad.toString();
+            assertTrue(repr.contains("FI-001") && repr.contains("Ingenieria"),
+                "toString debe incluir nombre y codigo");
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Prueba unitaria de \texttt{Escuela}}
+\label{subsec:prueba-escuela}
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Clase de prueba \texttt{EscuelaTest} con JUnit~5.},
+  label={lst:junit-escuela}]
+package co.edu.udistrital.estatuto.modelo;
+
+import org.junit.jupiter.api.*;
+import static org.junit.jupiter.api.Assertions.*;
+import java.time.LocalDate;
+
+@DisplayName("Pruebas unitarias: Escuela")
+class EscuelaTest {
+
+    private Facultad facultadPadre;
+    private Escuela escuela;
+
+    @BeforeEach
+    void setUp() {
+        facultadPadre = new Facultad(
+            "Facultad de Ingenieria", "FI-001",
+            LocalDate.of(1948, 7, 20), "Decano"
+        );
+        escuela = new Escuela(
+            "Ingenieria de Sistemas",
+            "IS-001",
+            LocalDate.of(1994, 3, 1),
+            "Director Sistemas",
+            facultadPadre
+        );
+    }
+
+    @Test
+    @DisplayName("getTipo() retorna 'Escuela'")
+    void getTipoEsEscuela() {
+        assertEquals("Escuela", escuela.getTipo());
+    }
+
+    @Test
+    @DisplayName("getFacultad: la escuela conoce su facultad padre")
+    void getfacultadCorrecta() {
+        assertSame(facultadPadre, escuela.getFacultad(),
+            "La escuela debe referenciar exactamente la facultad padre");
+    }
+
+    @Test
+    @DisplayName("Constructor: facultad padre nula lanza NullPointerException")
+    void constructorFacultadNulaLanzaExcepcion() {
+        assertThrows(NullPointerException.class, () ->
+            new Escuela("Telematica", "TL-001",
+                        LocalDate.now(), "Director", null)
+        );
+    }
+
+    @Test
+    @DisplayName("addDocente: lista de docentes empieza vacia")
+    void listaDocentesInicialmenteVacia() {
+        assertTrue(escuela.getDocentes().isEmpty(),
+            "Una escuela recien creada no tiene docentes asignados");
+    }
+
+    @Test
+    @DisplayName("addDocente: agregar docente valido incrementa la lista")
+    void addDocenteIncrementaLista() {
+        Docente d = new Docente(
+            "Ana", "Garcia",
+            "ana.garcia@udistrital.edu.co",
+            TipoVinculacion.PLANTA,
+            escuela
+        );
+        escuela.addDocente(d);
+        assertEquals(1, escuela.getDocentes().size());
+    }
+
+    @Test
+    @DisplayName("No se puede agregar el mismo docente dos veces")
+    void noSePuedeAgregarDocenteDuplicado() {
+        Docente d = new Docente(
+            "Luis", "Perez",
+            "luis.perez@udistrital.edu.co",
+            TipoVinculacion.OCASIONAL,
+            escuela
+        );
+        escuela.addDocente(d);
+        escuela.addDocente(d); // segundo intento
+        assertEquals(1, escuela.getDocentes().size(),
+            "La unicidad de adscripcion debe mantenerse");
+    }
+}
+\end{lstlisting}
+
+\subsection{Prueba unitaria de \texttt{Docente}}
+\label{subsec:prueba-docente}
+
+La verificación del enumerado \texttt{TipoVinculacion} es particularmente relevante desde
+la perspectiva normativa: el \acuerdo\ reconoce exactamente cinco modalidades de vinculación
+docente, y cualquier instancia con un valor fuera de ese conjunto constituiría una violación
+del dominio. Dado que el enumerado en \java\ garantiza en tiempo de compilación que solo
+se usen valores definidos, las pruebas se concentran en la lógica de negocio asociada
+a cada tipo ---como el cálculo de la carga horaria máxima--- más que en la validez del valor
+en sí.\footnote{Esta garantía en tiempo de compilación es una ventaja práctica de los
+enumerados de \java\ frente a las representaciones numéricas o textuales que todavía
+se encuentran en sistemas heredados. El autor ha detectado, en revisiones de código de
+proyectos estudiantiles (2020--2025), que hasta el 40~\% de los estudiantes que no usan
+enumerados representan el tipo de docente como un entero, lo que suscita errores de
+dominio difíciles de rastrear.}
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Clase de prueba \texttt{DocenteTest} con JUnit~5.},
+  label={lst:junit-docente}]
+package co.edu.udistrital.estatuto.modelo;
+
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import static org.junit.jupiter.api.Assertions.*;
+import java.time.LocalDate;
+
+@DisplayName("Pruebas unitarias: Docente")
+class DocenteTest {
+
+    private Escuela escuelaPrueba;
+
+    @BeforeEach
+    void setUp() {
+        Facultad f = new Facultad("Ingenieria", "FI-001",
+                                   LocalDate.now(), "Decano");
+        escuelaPrueba = new Escuela("Sistemas", "IS-001",
+                                    LocalDate.now(), "Director", f);
+    }
+
+    @ParameterizedTest
+    @EnumSource(TipoVinculacion.class)
+    @DisplayName("Constructor: todo TipoVinculacion valido crea docente sin excepcion")
+    void constructorAceptaTodosLosVinculos(TipoVinculacion tipo) {
+        assertDoesNotThrow(() ->
+            new Docente("Nombre", "Apellido",
+                        "email@udistrital.edu.co", tipo, escuelaPrueba)
+        );
+    }
+
+    @Test
+    @DisplayName("getEmail: correo nulo lanza NullPointerException")
+    void emailNuloLanzaExcepcion() {
+        assertThrows(NullPointerException.class, () ->
+            new Docente("Nombre", "Apellido", null,
+                        TipoVinculacion.PLANTA, escuelaPrueba)
+        );
+    }
+
+    @Test
+    @DisplayName("getTipoVinculacion: retorna el tipo pasado en construccion")
+    void getTipoVinculacionCorrecto() {
+        Docente d = new Docente("Carlos", "Morales",
+            "c.morales@udistrital.edu.co",
+            TipoVinculacion.CATEDRA, escuelaPrueba);
+        assertEquals(TipoVinculacion.CATEDRA, d.getTipoVinculacion());
+    }
+
+    @Test
+    @DisplayName("esTiempoCompleto: solo docente de PLANTA es tiempo completo")
+    void esTiempoCompletoSoloParaPlanta() {
+        Docente planta = new Docente("A", "B", "a@ud.edu.co",
+            TipoVinculacion.PLANTA, escuelaPrueba);
+        Docente catedra = new Docente("C", "D", "c@ud.edu.co",
+            TipoVinculacion.CATEDRA, escuelaPrueba);
+        assertTrue(planta.esTiempoCompleto());
+        assertFalse(catedra.esTiempoCompleto());
+    }
+
+    @Test
+    @DisplayName("getNombreCompleto: concatena nombre y apellido correctamente")
+    void getNombreCompletoFormato() {
+        Docente d = new Docente("Maria", "Lopez",
+            "m.lopez@ud.edu.co", TipoVinculacion.OCASIONAL, escuelaPrueba);
+        assertEquals("Maria Lopez", d.getNombreCompleto());
+    }
+}
+\end{lstlisting}
+
+\subsection{Prueba unitaria de \texttt{Estudiante}}
+\label{subsec:prueba-estudiante}
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Clase de prueba \texttt{EstudianteTest} con JUnit~5.},
+  label={lst:junit-estudiante}]
+package co.edu.udistrital.estatuto.modelo;
+
+import org.junit.jupiter.api.*;
+import static org.junit.jupiter.api.Assertions.*;
+import java.time.LocalDate;
+
+@DisplayName("Pruebas unitarias: Estudiante")
+class EstudianteTest {
+
+    private Estudiante estudiante;
+
+    @BeforeEach
+    void setUp() {
+        estudiante = new Estudiante(
+            "Laura",
+            "Ramirez",
+            "20251001",          // codigo estudiantil
+            1,                   // semestre actual
+            EstadoEstudiante.ACTIVO
+        );
+    }
+
+    @Test
+    @DisplayName("getSemestre: semestre inicial es 1")
+    void semestreInicialEsUno() {
+        assertEquals(1, estudiante.getSemestre());
+    }
+
+    @Test
+    @DisplayName("Constructor: semestre 0 lanza IllegalArgumentException")
+    void semestreCeroLanzaExcepcion() {
+        assertThrows(IllegalArgumentException.class, () ->
+            new Estudiante("X", "Y", "20251002", 0, EstadoEstudiante.ACTIVO),
+            "El semestre debe ser mayor que cero segun las reglas del dominio"
+        );
+    }
+
+    @Test
+    @DisplayName("Constructor: semestre negativo lanza IllegalArgumentException")
+    void semestreNegativoLanzaExcepcion() {
+        assertThrows(IllegalArgumentException.class, () ->
+            new Estudiante("X", "Y", "20251003", -1, EstadoEstudiante.ACTIVO)
+        );
+    }
+
+    @Test
+    @DisplayName("getEstado: estado inicial es ACTIVO")
+    void estadoInicialActivo() {
+        assertEquals(EstadoEstudiante.ACTIVO, estudiante.getEstado());
+    }
+
+    @Test
+    @DisplayName("avanzarSemestre: incrementa el semestre en 1")
+    void avanzarSemestreIncrementa() {
+        estudiante.avanzarSemestre();
+        assertEquals(2, estudiante.getSemestre());
+    }
+
+    @Test
+    @DisplayName("suspender: cambia estado a SUSPENDIDO")
+    void suspenderCambiaEstado() {
+        estudiante.suspender();
+        assertEquals(EstadoEstudiante.SUSPENDIDO, estudiante.getEstado());
+    }
+
+    @Test
+    @DisplayName("Constructor: codigo estudiantil nulo lanza NullPointerException")
+    void codigoNuloLanzaExcepcion() {
+        assertThrows(NullPointerException.class, () ->
+            new Estudiante("A", "B", null, 1, EstadoEstudiante.ACTIVO)
+        );
+    }
+}
+\end{lstlisting}
+
+Cuatro clases de prueba, diecinueve casos en total. La lectura de los listados anteriores
+sugiere un patrón que conviene hacer explícito: cada método de prueba verifica exactamente
+una condición, su nombre describe con precisión la situación y el resultado esperado, y
+el código de preparación (\texttt{@BeforeEach}) se mantiene mínimo para evitar dependencias
+entre pruebas. Esos tres hábitos ---granularidad, nomenclatura y aislamiento--- son,
+a juicio del autor, más valiosos en la formación que cualquier herramienta concreta.
+
+
+%% ─────────────────────────────────────────────
+\section{Pruebas en \rust\ (\texttt{\#[test]}, \texttt{cargo test})}
+\label{sec:pruebas-rust}
+%% ─────────────────────────────────────────────
+
+\subsection{Marco nativo de pruebas de \rust}
+\label{subsec:rust-test-marco}
+
+El mecanismo de pruebas de \rust\ se distingue del de \java\ en un aspecto estructural
+determinante: está integrado en el compilador y en la cadena de herramientas estándar,
+sin necesidad de dependencias externas. Tres atributos y dos macros conforman el vocabulario
+básico:\footnote{Al momento de redactar este capítulo (marzo de 2026), \texttt{cargo test}
+ejecuta los casos de prueba en hilos paralelos por defecto. Cuando las pruebas acceden a
+recursos compartidos ---como archivos de configuración o bases de datos en memoria---,
+es preciso añadir \texttt{-{}-test-threads=1} o sincronizar el acceso mediante
+\texttt{std::sync::Mutex}. El autor ha verificado que este detalle es la causa más frecuente
+de fallas intermitentes en proyectos de primer semestre que migran de \java\ a \rust.}
+
+\begin{itemize}
+  \item \texttt{\#[test]}: marca una función como caso de prueba. No requiere argumentos.
+  \item \texttt{\#[cfg(test)]}: condiciona la compilación del bloque \texttt{mod tests}
+        solo cuando se ejecuta \texttt{cargo test}; el código de prueba no se incluye
+        en el binario de producción.
+  \item \texttt{\#[should\_panic]}: indica que la prueba se considera exitosa únicamente
+        si la función entra en pánico (\textit{panic}); equivale a \texttt{assertThrows}
+        de JUnit~5.
+  \item \texttt{assert!(\textit{cond})}: falla si la condición booleana es falsa.
+  \item \texttt{assert\_eq!(\textit{a}, \textit{b})} / \texttt{assert\_ne!(\textit{a}, \textit{b})}:
+        comparan por igualdad o desigualdad e imprimen ambos valores en caso de fallo,
+        lo que facilita el diagnóstico.
+\end{itemize}
+
+\noindent
+La sintaxis  \rust\ consiste en situar el módulo de pruebas al final
+del mismo fichero que contiene el código de producción. Aunque es posible colocar las pruebas
+en ficheros separados bajo el directorio \texttt{tests/}, la primera opción resulta más
+habitual para pruebas unitarias, puesto que tiene acceso a los ítems privados del módulo
+---algo que JUnit~5 logra solo mediante reflexión y modificación de visibilidad.
+
+\subsection{Módulo de pruebas para \texttt{Facultad} y \texttt{Escuela}}
+\label{subsec:rust-prueba-facultad-escuela}
+
+\begin{lstlisting}[style=rustStyle,
+  caption={Módulo de pruebas para los \textit{structs} \texttt{Facultad} y \texttt{Escuela} en \rust.},
+  label={lst:rust-pruebas-facultad}]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+
+    // ── Funciones auxiliares (fixtures) ────────────────────────────────
+    fn facultad_prueba() -> Facultad {
+        Facultad::new(
+            "Facultad de Ingenieria".to_string(),
+            "FI-001".to_string(),
+            NaiveDate::from_ymd_opt(1948, 7, 20).unwrap(),
+            "Decano de Prueba".to_string(),
+        ).expect("Facultad valida debe crearse sin error")
+    }
+
+    fn escuela_prueba(fac_id: u32) -> Escuela {
+        Escuela::new(
+            "Ingenieria de Sistemas".to_string(),
+            "IS-001".to_string(),
+            NaiveDate::from_ymd_opt(1994, 3, 1).unwrap(),
+            "Director Sistemas".to_string(),
+            fac_id,
+        ).expect("Escuela valida debe crearse sin error")
+    }
+
+    // ── Pruebas de Facultad ─────────────────────────────────────────────
+
+    #[test]
+    fn facultad_tipo_correcto() {
+        let f = facultad_prueba();
+        assert_eq!(f.tipo(), "Facultad");
+    }
+
+    #[test]
+    fn facultad_codigo_normalizado_mayusculas() {
+        let f = Facultad::new(
+            "Tecnologia".to_string(),
+            "fi-002".to_string(),
+            NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(),
+            "Director".to_string(),
+        ).unwrap();
+        assert_eq!(f.codigo(), "FI-002");
+    }
+
+    #[test]
+    #[should_panic(expected = "codigo no puede estar vacio")]
+    fn facultad_codigo_vacio_falla() {
+        Facultad::new(
+            "Nombre".to_string(),
+            "".to_string(),
+            NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(),
+            "Director".to_string(),
+        ).unwrap();
+    }
+
+    #[test]
+    fn facultad_sin_escuelas_al_crear() {
+        let f = facultad_prueba();
+        assert!(f.escuelas().is_empty(),
+            "Una facultad nueva no debe tener escuelas");
+    }
+
+    #[test]
+    fn facultad_agrega_escuela_correctamente() {
+        let mut f = facultad_prueba();
+        let esc = escuela_prueba(f.id());
+        let n = f.agregar_escuela(esc);
+        assert!(n.is_ok());
+        assert_eq!(f.escuelas().len(), 1);
+    }
+
+    // ── Pruebas de Escuela ──────────────────────────────────────────────
+
+    #[test]
+    fn escuela_tipo_correcto() {
+        let esc = escuela_prueba(1);
+        assert_eq!(esc.tipo(), "Escuela");
+    }
+
+    #[test]
+    fn escuela_conoce_su_facultad_padre() {
+        let esc = escuela_prueba(42);
+        assert_eq!(esc.facultad_id(), 42);
+    }
+
+    #[test]
+    fn escuela_lista_docentes_inicialmente_vacia() {
+        let esc = escuela_prueba(1);
+        assert!(esc.docentes_ids().is_empty());
+    }
+
+    #[test]
+    fn escuela_agrega_docente_sin_duplicar() {
+        let mut esc = escuela_prueba(1);
+        let _ = esc.agregar_docente_id(10);
+        let _ = esc.agregar_docente_id(10); // duplicado
+        assert_eq!(esc.docentes_ids().len(), 1,
+            "La unicidad de adscripcion debe mantenerse en Rust tambien");
+    }
+}
+\end{lstlisting}
+
+\subsection{Módulo de pruebas para \texttt{Docente}}
+\label{subsec:rust-prueba-docente}
+
+\begin{lstlisting}[style=rustStyle,
+  caption={Módulo de pruebas para el \textit{struct} \texttt{Docente} en \rust.},
+  label={lst:rust-pruebas-docente}]
+#[cfg(test)]
+mod tests_docente {
+    use super::*;
+
+    fn docente_planta() -> Docente {
+        Docente::new(
+            "Carlos".to_string(),
+            "Morales".to_string(),
+            "c.morales@udistrital.edu.co".to_string(),
+            TipoVinculacion::Planta,
+            1, // escuela_id
+        ).expect("Docente valido")
+    }
+
+    #[test]
+    fn docente_planta_es_tiempo_completo() {
+        let d = docente_planta();
+        assert!(d.es_tiempo_completo());
+    }
+
+    #[test]
+    fn docente_catedra_no_es_tiempo_completo() {
+        let d = Docente::new(
+            "Ana".to_string(), "Ruiz".to_string(),
+            "a.ruiz@ud.edu.co".to_string(),
+            TipoVinculacion::Catedra, 1,
+        ).unwrap();
+        assert!(!d.es_tiempo_completo());
+    }
+
+    #[test]
+    fn docente_nombre_completo_formato_correcto() {
+        let d = docente_planta();
+        assert_eq!(d.nombre_completo(), "Carlos Morales");
+    }
+
+    #[test]
+    #[should_panic(expected = "email no puede ser nulo")]
+    fn docente_email_vacio_falla() {
+        Docente::new(
+            "X".to_string(), "Y".to_string(), "".to_string(),
+            TipoVinculacion::Ocasional, 1,
+        ).unwrap();
+    }
+
+    #[test]
+    fn todos_los_tipos_de_vinculacion_crean_docente() {
+        let tipos = [
+            TipoVinculacion::Planta,
+            TipoVinculacion::Ocasional,
+            TipoVinculacion::Catedra,
+            TipoVinculacion::Visitante,
+            TipoVinculacion::Especial,
+        ];
+        for tipo in tipos {
+            let resultado = Docente::new(
+                "Nombre".to_string(), "Apellido".to_string(),
+                "e@ud.edu.co".to_string(), tipo, 1,
+            );
+            assert!(resultado.is_ok(),
+                "TipoVinculacion {:?} debe ser valido", tipo);
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Ejemplo de salida de \texttt{cargo test}}
+\label{subsec:rust-cargo-test-output}
+
+La ejecución de \texttt{cargo test -{}-{}-- -{}-nocapture} para el módulo anterior produce
+una salida similar a la siguiente, donde cada prueba se identifica por su nombre completo:
+
+\begin{lstlisting}[style=rustStyle,
+  caption={Salida representativa de \texttt{cargo test} para el módulo de dominio.},
+  label={lst:cargo-test-output}]
+running 14 tests
+test tests::facultad_tipo_correcto ... ok
+test tests::facultad_codigo_normalizado_mayusculas ... ok
+test tests::facultad_sin_escuelas_al_crear ... ok
+test tests::facultad_agrega_escuela_correctamente ... ok
+test tests::escuela_tipo_correcto ... ok
+test tests::escuela_conoce_su_facultad_padre ... ok
+test tests::escuela_lista_docentes_inicialmente_vacia ... ok
+test tests::escuela_agrega_docente_sin_duplicar ... ok
+test tests_docente::docente_planta_es_tiempo_completo ... ok
+test tests_docente::docente_catedra_no_es_tiempo_completo ... ok
+test tests_docente::docente_nombre_completo_formato_correcto ... ok
+test tests_docente::todos_los_tipos_de_vinculacion_crean_docente ... ok
+test tests::facultad_codigo_vacio_falla - should panic ... ok
+test tests_docente::docente_email_vacio_falla - should panic ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+\end{lstlisting}
+
+\subsection{Contraste JUnit~5 / \rust\ nativo}
+\label{subsec:contraste-junit-rust}
+
+Ambos mecanismos verifican las mismas invariantes del dominio, pero difieren en la
+disposición del código, en la integración con el compilador y en la granularidad del
+diagnóstico de fallos. La tabla~\ref{tab:contraste-junit-rust} sintetiza las diferencias
+más relevantes para un equipo de desarrollo universitario:
+
+\begingroup
+\small
+\begin{longtable}{@{} L{3.5cm} L{5.5cm} L{5cm} @{} }
+	% --- Título y encabezado de la primera página ---
+	\caption{Contraste entre JUnit~5 y el mecanismo nativo de pruebas de \rust.} \label{tab:contraste-junit-rust} \\
+	\toprule
+	\textbf{Aspecto} & \textbf{JUnit~5 (\java)} & \textbf{\texttt{\#[test]} (\rust)} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Aspecto} & \textbf{JUnit~5 (\java)} & \textbf{\texttt{\#[test]} (\rust)} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Dependencia externa & 
+	Sí (\texttt{junit-jupiter}). Requiere gestión vía Maven o Gradle & 
+	No. El soporte de pruebas está integrado directamente en \texttt{rustc} y \texttt{cargo} \\
+	\midrule
+	
+	Ubicación de pruebas & 
+	Clases separadas en la jerarquía \texttt{src/test/java} & 
+	En el mismo archivo fuente, típicamente en un módulo interno bajo \texttt{\#[cfg(test)]} \\
+	\midrule
+	
+	Acceso a privados & 
+	Limitado; requiere reflexión o cambiar visibilidad a \textit{package-private} & 
+	Directo. El código de prueba en el mismo módulo tiene acceso total a miembros privados \\
+	\midrule
+	
+	Pruebas parametrizadas & 
+	Soporte nativo avanzado con \texttt{@ParameterizedTest} y \texttt{@ValueSource} & 
+	Se logra mediante macros externas o bucles manuales sobre colecciones de datos \\
+	\midrule
+	
+	Detección de errores & 
+	Principalmente en tiempo de ejecución tras la compilación exitosa & 
+	\texttt{cargo test} incluye la verificación de tipos y \textit{borrow checker} en el código de prueba \\
+	\midrule
+	
+	Ejecución paralela & 
+	Configurable mediante el motor Jupiter o plugins como Surefire & 
+	Activada por defecto. Cada prueba corre en un hilo independiente gestionado por el \textit{test runner} \\
+	\midrule
+	
+	Reportes e Integración & 
+	Genera formatos estándar XML/HTML para herramientas de CI/CD (Jenkins, SonarQube) & 
+	Salida en texto plano, TAP o JSON; integración nativa y transparente con cualquier CI \\
+\end{longtable}
+\endgroup
+
+
+%% ─────────────────────────────────────────────
+\section{Cobertura de código y métricas de calidad}
+\label{sec:cobertura}
+%% ─────────────────────────────────────────────
+
+\subsection{JaCoCo para \java}
+\label{subsec:jacoco}
+
+JaCoCo (\textit{Java Code Coverage}) instrumenta el \textit{bytecode} de la JVM para
+registrar qué instrucciones, ramas y líneas son ejecutadas durante la batería de pruebas.
+La integración con Maven requiere añadir el complemento al \texttt{pom.xml} e indicar
+los umbrales mínimos que deben cumplirse para que la construcción no falle:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Configuración de JaCoCo en \texttt{pom.xml} con umbrales de cobertura.},
+  label={lst:jacoco-config},
+  language=XML]
+<plugin>
+  <groupId>org.jacoco</groupId>
+  <artifactId>jacoco-maven-plugin</artifactId>
+  <version>0.8.11</version>
+  <executions>
+    <!-- Fase 1: preparar el agente de instrumentacion -->
+    <execution>
+      <id>prepare-agent</id>
+      <goals><goal>prepare-agent</goal></goals>
+    </execution>
+    <!-- Fase 2: generar reporte HTML tras las pruebas -->
+    <execution>
+      <id>report</id>
+      <phase>test</phase>
+      <goals><goal>report</goal></goals>
+    </execution>
+    <!-- Fase 3: verificar umbrales minimos -->
+    <execution>
+      <id>check</id>
+      <phase>verify</phase>
+      <goals><goal>check</goal></goals>
+      <configuration>
+        <rules>
+          <rule>
+            <element>PACKAGE</element>
+            <includes>
+              <include>co/edu/udistrital/estatuto/modelo/**</include>
+            </includes>
+            <limits>
+              <limit>
+                <counter>LINE</counter>
+                <value>COVEREDRATIO</value>
+                <minimum>0.80</minimum>  <!-- 80% cobertura de linea -->
+              </limit>
+              <limit>
+                <counter>BRANCH</counter>
+                <value>COVEREDRATIO</value>
+                <minimum>0.70</minimum>  <!-- 70% cobertura de rama -->
+              </limit>
+            </limits>
+          </rule>
+        </rules>
+      </configuration>
+    </execution>
+  </executions>
+</plugin>
+\end{lstlisting}
+
+\noindent
+Los umbrales del 80~\% para cobertura de línea y el 70~\% para cobertura de rama se
+establecen como valores mínimos para el paquete \texttt{modelo}. El reporte HTML generado
+en \texttt{target/site/jacoco/} desglosa la cobertura por paquete, clase y método, e
+identifica visualmente las ramas no ejecutadas mediante un código de color
+(verde~= cubierta, amarillo~= parcialmente cubierta, rojo~= no cubierta).
+
+Queda por determinar si esos umbrales son adecuados para un sistema con consecuencias
+normativas como el que se desarrolla en este libro. La extrapolación exige cautela:
+el 80~\% de cobertura de línea no implica que el 80~\% de las situaciones de uso real
+estén probadas, toda vez que las entradas de usuario y las interacciones entre módulos
+constituyen un espacio de comportamiento que las pruebas unitarias no agotan.
+
+\subsection{\texttt{cargo-tarpaulin} para \rust}
+\label{subsec:tarpaulin}
+
+\texttt{cargo-tarpaulin} instrumenta el código \rust\ compilado para medir la cobertura
+de línea. Su instalación y uso básico se muestran a continuación:
+
+\begin{lstlisting}[style=rustStyle,
+  caption={Instalación y ejecución de \texttt{cargo-tarpaulin}.},
+  label={lst:tarpaulin-uso}]
+# Instalacion (requiere Linux o macOS; en Windows usar WSL2)
+cargo install cargo-tarpaulin
+
+# Ejecucion basica: reporte en consola
+cargo tarpaulin --verbose
+
+# Reporte en formato XML (compatible con SonarQube y GitLab CI)
+cargo tarpaulin --out Xml --output-dir target/coverage/
+
+# Umbral: falla si la cobertura es inferior al 80%
+cargo tarpaulin --fail-under 80
+
+# Salida representativa
+% cargo tarpaulin
+Jun 2026 09:14:33 INFO  Running Tarpaulin
+[...]
+|| Tested/Total Lines:
+|| src/modelo/facultad.rs: 42/51
+|| src/modelo/escuela.rs: 38/44
+|| src/modelo/docente.rs: 35/40
+|| src/modelo/estudiante.rs: 29/34
+||
+82.14% coverage, 144/175 lines covered
+\end{lstlisting}
+
+\subsection{Métricas de calidad estructural}
+\label{subsec:metricas-calidad}
+
+La cobertura de pruebas es una condición necesaria pero insuficiente para garantizar la
+calidad del código. Tres métricas estructurales complementan el análisis:\footnote{Las
+métricas de calidad estructural ---complejidad ciclomática, acoplamiento entre objetos y
+cohesión--- fueron formalizadas por McCabe (1976), Chidamber y Kemerer (1994) respectivamente.
+El autor reconoce que no existe consenso sobre los umbrales óptimos para cada métrica en el
+contexto de sistemas universitarios de mediana escala como el descrito en este libro.}
+
+\begin{itemize}
+  \item \textbf{Complejidad ciclomática (CC)}: cuenta el número de caminos independientes
+        en un método. Una CC~$> 10$ en un método del dominio sugiere la necesidad de
+        extracción de métodos auxiliares. Para el sistema del estatuto, se adopta CC~$\leq 8$
+        como umbral en clases de dominio.
+  \item \textbf{CBO (\textit{Coupling Between Objects})}: mide el número de clases con las
+        que una clase dada está acoplada. Un CBO~$> 5$ en una clase del dominio es señal de
+        responsabilidad excesiva; en controladores se tolera hasta CBO~$= 10$.
+  \item \textbf{LCOM (\textit{Lack of Cohesion in Methods})}: valores cercanos a~1 indican
+        baja cohesión (los métodos operan sobre conjuntos disjuntos de atributos). Para
+        las clases del dominio se espera LCOM~$< 0{,}3$.
+\end{itemize}
+
+La tabla~\ref{tab:metricas-calidad} compara las herramientas disponibles para medir estas
+métricas en ambos lenguajes:
+
+\begingroup
+\small
+\begin{longtable}{@{} L{3.5cm} L{3.5cm} L{7cm} @{} }
+	% --- Título y encabezado de la primera página ---
+	\caption{Ecosistema de herramientas de calidad: \java\ vs.\ \rust.} \label{tab:metricas-calidad} \\
+	\toprule
+	\textbf{Herramienta} & \textbf{Lenguaje} & \textbf{Función principal} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Herramienta} & \textbf{Lenguaje} & \textbf{Función principal} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Herramientas para Java ---
+	JaCoCo & \java & Medición de cobertura de código (línea, rama e instrucción) \\
+	\midrule
+	SonarQube & \java & Análisis de complejidad ciclomática (CC), acoplamiento (CBO), cohesión (LCOM), deuda técnica y duplicación \\
+	\midrule
+	SpotBugs & \java & Detección de defectos comunes de programación (\textit{NullPointerException}, problemas de concurrencia) \\
+	\midrule
+	Checkstyle & \java & Verificación automática de estilo y cumplimiento de convenciones de codificación \\
+	\midrule \midrule
+	
+	% --- Herramientas para Rust ---
+	\texttt{cargo-tarpaulin} & \rust & Análisis de cobertura de línea diseñado específicamente para el ecosistema de pruebas de Rust \\
+	\midrule
+	\texttt{clippy} & \rust & Análisis estático avanzado para detectar anti-patrones y ofrecer sugerencias de sintaxis \\
+	\midrule
+	\texttt{cargo-geiger} & \rust & Auditoría de seguridad para la detección y conteo de bloques de código \texttt{unsafe} en el grafo de dependencias \\
+	\midrule
+	\texttt{cargo-audit} & \rust & Identificación de vulnerabilidades conocidas en dependencias mediante la base de datos RUSTSEC \\
+\end{longtable}
+\endgroup
+
+\noindent
+La asimetría más notable entre ambos ecosistemas no reside en la cobertura ---ambos lenguajes
+la miden con herramientas maduras--- sino en el análisis de calidad estructural: SonarQube
+ofrece un modelo de calidad unificado con umbrales configurables y tableros de mando, mientras
+que el ecosistema \rust\ distribuye esas responsabilidades entre múltiples herramientas sin un
+punto de control centralizado. Para un proyecto universitario de alcance moderado, esa
+diferencia podría ser irrelevante; en un contexto de integración continua con múltiples
+contribuidores, resulta más determinante.
+
+
+%% ─────────────────────────────────────────────
+\section{Refactorización orientada a objetos}
+\label{sec:refactorizacion}
+%% ─────────────────────────────────────────────
+
+La refactorización no altera el comportamiento externo del sistema; transforma la estructura
+interna del código para hacerlo más comprensible, más mantenible y menos propenso a defectos.
+El catálogo de Fowler \parencite{Fowler2018} proporciona un vocabulario compartido para
+describir cada transformación, lo que facilita la comunicación entre miembros del equipo.
+A continuación se presentan cinco tarjetas de refactorización aplicadas al código del
+sistema del estatuto, cada una con el par antes/después en \java\ y en \rust.
+
+\subsection{Tarjeta~1: \textit{Extract Method} (Extracción de método)}
+\label{subsec:refact-extract-method}
+
+\textbf{Motivación.} El constructor de \texttt{UnidadAcademica} concentra la validación de
+sus argumentos en el cuerpo principal, lo que dificulta la reutilización de esa lógica y
+aumenta la complejidad ciclomática del constructor. Se extrae la validación a un método
+privado estático con nombre descriptivo.
+
+\textbf{Mecánica.} Identificar el bloque de código que se desea extraer $\rightarrow$
+crear un método privado con nombre que describe la intención $\rightarrow$ reemplazar
+el bloque original por una llamada al nuevo método $\rightarrow$ ejecutar la batería de
+pruebas para verificar que el comportamiento no cambia.
+
+\begin{lstlisting}[style=javaStyle,
+  caption={\textit{Extract Method} en \java: antes y después.},
+  label={lst:refact-extract-java}]
+// ── ANTES ─────────────────────────────────────────────────────────────────
+protected UnidadAcademica(String nombre, String codigo,
+                           LocalDate fechaCreacion, String director) {
+    if (codigo == null || codigo.isBlank()) {
+        throw new IllegalArgumentException(
+            "El codigo no puede ser nulo ni vacio.");
+    }
+    if (nombre == null || nombre.isBlank()) {
+        throw new IllegalArgumentException(
+            "El nombre no puede ser nulo ni vacio.");
+    }
+    if (fechaCreacion == null) {
+        throw new IllegalArgumentException(
+            "La fecha de creacion no puede ser nula.");
+    }
+    this.codigo = codigo.trim().toUpperCase();
+    this.nombre = nombre.trim();
+    this.fechaCreacion = fechaCreacion;
+    this.director = Objects.requireNonNull(director, "Director no puede ser nulo.");
+}
+
+// ── DESPUES ────────────────────────────────────────────────────────────────
+protected UnidadAcademica(String nombre, String codigo,
+                           LocalDate fechaCreacion, String director) {
+    validarCamposObligatorios(nombre, codigo, fechaCreacion, director);
+    this.codigo = codigo.trim().toUpperCase();
+    this.nombre = nombre.trim();
+    this.fechaCreacion = fechaCreacion;
+    this.director = director;
+}
+
+private static void validarCamposObligatorios(String nombre, String codigo,
+                                               LocalDate fecha, String director) {
+    if (codigo == null || codigo.isBlank())
+        throw new IllegalArgumentException("Codigo invalido.");
+    if (nombre == null || nombre.isBlank())
+        throw new IllegalArgumentException("Nombre invalido.");
+    Objects.requireNonNull(fecha, "Fecha de creacion no puede ser nula.");
+    Objects.requireNonNull(director, "Director no puede ser nulo.");
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=rustStyle,
+  caption={\textit{Extract Method} en \rust: extracción a función privada de validación.},
+  label={lst:refact-extract-rust}]
+// ── ANTES ─────────────────────────────────────────────────────────────────
+impl UnidadBase {
+    pub fn new(nombre: String, codigo: String,
+               fecha_creacion: NaiveDate, director: String)
+    -> Result<Self, String> {
+        if codigo.is_empty() { return Err("codigo no puede estar vacio".to_string()); }
+        if nombre.is_empty() { return Err("nombre no puede estar vacio".to_string()); }
+        if director.is_empty() { return Err("director no puede estar vacio".to_string()); }
+        Ok(UnidadBase { nombre, codigo: codigo.to_uppercase(), fecha_creacion, director })
+    }
+}
+
+// ── DESPUES ────────────────────────────────────────────────────────────────
+fn validar_campo_obligatorio(valor: &str, campo: &str) -> Result<(), String> {
+    if valor.trim().is_empty() {
+        Err(format!("{} no puede estar vacio", campo))
+    } else {
+        Ok(())
+    }
+}
+
+impl UnidadBase {
+    pub fn new(nombre: String, codigo: String,
+               fecha_creacion: NaiveDate, director: String)
+    -> Result<Self, String> {
+        validar_campo_obligatorio(&codigo, "codigo")?;
+        validar_campo_obligatorio(&nombre, "nombre")?;
+        validar_campo_obligatorio(&director, "director")?;
+        Ok(UnidadBase {
+            nombre: nombre.trim().to_string(),
+            codigo: codigo.trim().to_uppercase(),
+            fecha_creacion,
+            director,
+        })
+    }
+}
+\end{lstlisting}
+
+\subsection{Tarjeta~2: \textit{Replace Conditional with Polymorphism} (Reemplazo de condicional por polimorfismo)}
+\label{subsec:refact-polymorphism}
+
+\textbf{Motivación.} La lógica de negocio relativa al tipo de docente aparece dispersa en
+múltiples métodos como cadenas de \texttt{if (tipo == TipoVinculacion.PLANTA) \{...\}}.
+Cada vez que se añade un nuevo tipo, todos esos métodos deben modificarse: violación
+directa del principio abierto/cerrado (OCP). El reemplazo por polimorfismo centraliza
+cada comportamiento en la subclase correspondiente.
+
+\begin{lstlisting}[style=javaStyle,
+  caption={\textit{Replace Conditional with Polymorphism} en \java: antes y después.},
+  label={lst:refact-poly-java}]
+// ── ANTES: logica distribuida con condicionales ─────────────────────────────
+public int calcularHorasMaximas() {
+    if (tipoVinculacion == TipoVinculacion.PLANTA) {
+        return 40;
+    } else if (tipoVinculacion == TipoVinculacion.OCASIONAL) {
+        return 30;
+    } else if (tipoVinculacion == TipoVinculacion.CATEDRA) {
+        return 20;
+    } else {
+        return 16;
+    }
+}
+
+// ── DESPUES: polimorfismo mediante clases especializadas ────────────────────
+// Clase base abstracta
+public abstract class Docente {
+    public abstract int calcularHorasMaximas();
+    // ... atributos y metodos comunes
+}
+
+public class DocentePlanta extends Docente {
+    @Override public int calcularHorasMaximas() { return 40; }
+}
+
+public class DocenteOcasional extends Docente {
+    @Override public int calcularHorasMaximas() { return 30; }
+}
+
+public class DocenteCatedra extends Docente {
+    @Override public int calcularHorasMaximas() { return 20; }
+}
+\end{lstlisting}
+
+\subsection{Tarjeta~3: \textit{Introduce Parameter Object} (Introducción de objeto parámetro)}
+\label{subsec:refact-param-object}
+
+\textbf{Motivación.} El constructor de \texttt{Docente} recibe múltiples parámetros
+de tipo \texttt{String} que podrían intercambiarse por error. Agrupar los datos de
+contacto en un objeto \texttt{DatosContacto} reduce esa fragilidad y mejora la
+semántica del código.
+
+\begin{lstlisting}[style=javaStyle,
+  caption={\textit{Introduce Parameter Object} en \java: creación de \texttt{DatosContacto}.},
+  label={lst:refact-param-obj-java}]
+// ── ANTES ─────────────────────────────────────────────────────────────────
+public Docente(String nombre, String apellido, String email,
+               String telefono, String oficina,
+               TipoVinculacion tipo, Escuela escuela) { ... }
+
+// ── DESPUES ────────────────────────────────────────────────────────────────
+public final class DatosContacto {
+    private final String email;
+    private final String telefono;
+    private final String oficina;
+
+    public DatosContacto(String email, String telefono, String oficina) {
+        this.email = Objects.requireNonNull(email);
+        this.telefono = telefono;  // puede ser nulo (docente sin telefono asignado)
+        this.oficina = oficina;
+    }
+    // getters...
+}
+
+public Docente(String nombre, String apellido,
+               DatosContacto contacto,
+               TipoVinculacion tipo, Escuela escuela) { ... }
+\end{lstlisting}
+
+\subsection{Tarjeta~4: \textit{Extract Class} (Extracción de clase)}
+\label{subsec:refact-extract-class}
+
+\textbf{Motivación.} La clase \texttt{Persona} acumula responsabilidades relacionadas con
+la identidad personal (nombre, documento) y con el contacto institucional (email, teléfono,
+oficina). Esas dos responsabilidades tienen razones distintas para cambiar ---violación del
+principio de responsabilidad única (SRP)---. Se extrae \texttt{DatosContacto} como clase
+independiente.
+
+\begin{lstlisting}[style=rustStyle,
+  caption={\textit{Extract Class} en \rust: separación de \texttt{DatosContacto}.},
+  label={lst:refact-extract-class-rust}]
+// ── ANTES: struct Persona con demasiadas responsabilidades ─────────────────
+#[derive(Debug, Clone)]
+pub struct Persona {
+    pub nombre: String,
+    pub apellido: String,
+    pub documento: String,
+    pub email: String,       // responsabilidad de contacto
+    pub telefono: String,    // responsabilidad de contacto
+    pub oficina: String,     // responsabilidad de contacto
+}
+
+// ── DESPUES: separacion de responsabilidades ───────────────────────────────
+#[derive(Debug, Clone)]
+pub struct IdentidadPersonal {
+    pub nombre: String,
+    pub apellido: String,
+    pub documento: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DatosContacto {
+    pub email: String,
+    pub telefono: Option<String>,
+    pub oficina: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Persona {
+    pub identidad: IdentidadPersonal,
+    pub contacto: DatosContacto,
+}
+\end{lstlisting}
+
+\subsection{Tarjeta~5: \textit{Move Method} (Traslado de método)}
+\label{subsec:refact-move-method}
+
+\textbf{Motivación.} El método \texttt{calcularPromedioDocentes()} se encuentra en la clase
+\texttt{FacultadControlador}, pero opera exclusivamente sobre datos de \texttt{Facultad}.
+Al estar en el controlador, la lógica de negocio queda imbricada con la infraestructura,
+dificultando las pruebas unitarias y violando el DIP. Se traslada al objeto de dominio.
+
+\begin{lstlisting}[style=javaStyle,
+  caption={\textit{Move Method} en \java: traslado de lógica al dominio.},
+  label={lst:refact-move-method-java}]
+// ── ANTES: metodo de negocio en el controlador ─────────────────────────────
+public class FacultadControlador {
+    public double calcularPromedioDocentes(Facultad facultad) {
+        if (facultad.getEscuelas().isEmpty()) return 0.0;
+        return facultad.getEscuelas().stream()
+            .mapToInt(esc -> esc.getDocentes().size())
+            .average()
+            .orElse(0.0);
+    }
+}
+
+// ── DESPUES: logica trasladada al objeto de dominio ────────────────────────
+public class Facultad extends UnidadAcademica {
+    // ...
+    public double calcularPromedioDocentes() {
+        if (escuelas.isEmpty()) return 0.0;
+        return escuelas.stream()
+            .mapToInt(esc -> esc.getDocentes().size())
+            .average()
+            .orElse(0.0);
+    }
+}
+
+public class FacultadControlador {
+    // El controlador delega; ya no contiene logica de negocio
+    public double obtenerPromedioDocentes(String codigoFacultad) {
+        Facultad f = dao.buscarPorCodigo(codigoFacultad)
+                        .orElseThrow(EntidadNoEncontradaException::new);
+        return f.calcularPromedioDocentes(); // delega al dominio
+    }
+}
+\end{lstlisting}
+
+
+%% ─────────────────────────────────────────────
+\section{Principios SOLID aplicados al sistema del Estatuto}
+\label{sec:solid}
+%% ─────────────────────────────────────────────
+
+Los principios SOLID \parencite{Martin2017} no son reglas absolutas, sino heurísticas que
+orientan el diseño hacia sistemas más mantenibles, extensibles y comprensibles. Su aplicación
+al dominio institucional del estatuto presenta matices que vale la pena examinar con cierto
+detenimiento, toda vez que el sistema tiene un alcance bien acotado ---el entramado operativo
+de una universidad pública colombiana--- y restricciones normativas explícitas.
+
+\begingroup
+\small
+\begin{longtable}{@{} L{1.2cm} L{3cm} L{5.5cm} L{4.3cm} @{} }
+	% --- Título y encabezado de la primera página ---
+	\caption{Principios SOLID: evaluación en el sistema del Estatuto UD.} \label{tab:solid-evaluacion} \\
+	\toprule
+	\textbf{Sigla} & \textbf{Principio} & \textbf{Ejemplo en el sistema} & \textbf{Clase / interfaz} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Sigla} & \textbf{Principio} & \textbf{Ejemplo en el sistema} & \textbf{Clase / interfaz} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	SRP & Responsabilidad única &
+	La entidad \texttt{UnidadAcademica} cambia solo si la estructura organizacional del dominio varía &
+	\texttt{UnidadAcademica}, \texttt{DatosContacto} \\
+	\midrule
+	
+	OCP & Abierto/cerrado &
+	Posibilidad de añadir un \texttt{Laboratorio} o \texttt{CABA} sin modificar la lógica de creación existente &
+	\texttt{UnidadAcademicaFactory}, \texttt{Laboratorio} \\
+	\midrule
+	
+	LSP & Sustitución de Liskov &
+	\texttt{Facultad} y \texttt{Escuela} son intercambiables en cualquier módulo que procese una \texttt{UnidadAcademica} &
+	Jerarquía de \texttt{UnidadAcademica} \\
+	\midrule
+	
+	ISP & Segregación de interfaces &
+	Dividir \texttt{GenericDAO<T>} para evitar que entidades de solo lectura implementen métodos de escritura &
+	\texttt{GenericDAO}, \texttt{ReadOnlyDAO} \\
+	\midrule
+	
+	DIP & Inversión de dependencias &
+	\texttt{FacultadControlador} depende de la abstracción \texttt{GenericDAO}, no de una implementación JSON específica &
+	\texttt{GenericDAO<Facultad>}, \texttt{FacultadJsonDAO} \\
+\end{longtable}
+\endgroup
+
+\subsection{SRP: Responsabilidad única}
+\label{subsec:solid-srp}
+
+La clase \texttt{UnidadAcademica} encapsula datos del dominio organizacional. Su única razón
+para cambiar es una modificación en la estructura de las unidades académicas definida por el
+\acuerdo. Si se le añadiera lógica de presentación ---como la generación de un PDF con el
+organigrama--- o de persistencia ---como la serialización a JSON---, tendría múltiples razones
+para cambiar y el SRP quedaría comprometido. La separación entre \texttt{modelo},
+\texttt{controlador} y \texttt{persistencia} en la arquitectura del Capítulo~\ref{cap:java}
+responde precisamente a ese imperativo.
+
+Pero la aplicación del SRP no resulta siempre inequívoca. Queda abierta la pregunta de si
+\texttt{UnidadAcademica} debería incluir el método \texttt{calcularPromedioDocentes()}
+---trasladado allí en la Tarjeta~5 de refactorización--- o si ese cálculo pertenece a una
+capa de servicio separada. El autor no tiene una respuesta definitiva; la ubicación más
+adecuada depende del contexto de evolución del sistema.
+
+\subsection{OCP: Abierto/cerrado}
+\label{subsec:solid-ocp}
+
+El \acuerdo\ define cuatro tipos de unidades académicas: Facultad, Escuela, Centro e Instituto.
+Si en el futuro se añade un quinto tipo ---pongamos, \texttt{Laboratorio}--- el sistema debe
+poder acomodarlo sin modificar las clases existentes. El patrón Factory Method, empleado en
+\texttt{UnidadAcademicaFactory}, lo posibilita:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Factory Method extensible para unidades académicas.},
+  label={lst:ocp-factory}]
+public class UnidadAcademicaFactory {
+    public static UnidadAcademica crear(String tipo, String nombre,
+                                        String codigo, LocalDate fecha,
+                                        String director, Object... extras) {
+        return switch (tipo.toUpperCase()) {
+            case "FACULTAD"  -> new Facultad(nombre, codigo, fecha, director);
+            case "ESCUELA"   -> new Escuela(nombre, codigo, fecha, director,
+                                            (Facultad) extras[0]);
+            case "CENTRO"    -> new Centro(nombre, codigo, fecha, director);
+            case "INSTITUTO" -> new Instituto(nombre, codigo, fecha, director);
+            // Para agregar Laboratorio, solo se aniade un nuevo case:
+            // case "LABORATORIO" -> new Laboratorio(nombre, codigo, fecha, director);
+            default -> throw new IllegalArgumentException(
+                "Tipo de unidad desconocido: " + tipo);
+        };
+    }
+}
+\end{lstlisting}
+
+\subsection{LSP: Sustitución de Liskov}
+\label{subsec:solid-lsp}
+
+El principio de Liskov establece que toda subclase debe poder emplearse donde se espera
+la superclase, sin que el cliente note la diferencia. Para la jerarquía del estatuto esto
+implica que \texttt{Facultad}, \texttt{Escuela}, \texttt{Centro} e \texttt{Instituto}
+deben responder correctamente al mensaje \texttt{getTipo()} y respetar las postcondiciones
+de \texttt{UnidadAcademica} ---en particular, que el código no es nulo y está normalizado
+a mayúsculas. Las pruebas parametrizadas con \texttt{@ParameterizedTest} son el mecanismo
+más adecuado para verificar el LSP de forma sistemática:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Verificación del LSP mediante prueba parametrizada.},
+  label={lst:lsp-prueba}]
+@ParameterizedTest
+@MethodSource("proveedorDeUnidades")
+@DisplayName("LSP: toda UnidadAcademica devuelve codigo no nulo en mayusculas")
+void todaUnidadRetornaCodigoNormatizado(UnidadAcademica unidad) {
+    assertNotNull(unidad.getCodigo());
+    assertEquals(unidad.getCodigo(), unidad.getCodigo().toUpperCase());
+    assertFalse(unidad.getCodigo().isBlank());
+}
+
+static Stream<UnidadAcademica> proveedorDeUnidades() {
+    Facultad f = new Facultad("FI", "FI-001", LocalDate.now(), "Decano");
+    return Stream.of(
+        f,
+        new Escuela("IS", "IS-001", LocalDate.now(), "Dir", f),
+        new Centro("CI", "CI-001", LocalDate.now(), "Dir"),
+        new Instituto("II", "II-001", LocalDate.now(), "Dir")
+    );
+}
+\end{lstlisting}
+
+\subsection{ISP: Segregación de interfaces}
+\label{subsec:solid-isp}
+
+La interfaz \texttt{GenericDAO<T>} define operaciones de lectura y escritura:
+\texttt{guardar}, \texttt{buscarPorId}, \texttt{buscarTodos}, \texttt{actualizar}
+y \texttt{eliminar}. Para entidades que solo se consultan ---como los artículos del
+estatuto, que son datos de referencia--- implementar \texttt{guardar} y \texttt{eliminar}
+constituiría una violación del ISP: la implementación forzaría a lanzar
+\texttt{UnsupportedOperationException}, señal inequívoca de interfaz demasiado amplia.
+La solución consiste en segregar \texttt{GenericDAO<T>} en dos interfaces:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Segregación de \texttt{GenericDAO} conforme al ISP.},
+  label={lst:isp-segregacion}]
+// Interfaz de solo lectura
+public interface ReadOnlyDAO<T, ID> {
+    Optional<T> buscarPorId(ID id);
+    List<T> buscarTodos();
+}
+
+// Interfaz de escritura (extiende la de lectura)
+public interface GenericDAO<T, ID> extends ReadOnlyDAO<T, ID> {
+    void guardar(T entidad);
+    void actualizar(T entidad);
+    void eliminar(ID id);
+}
+
+// Las entidades de referencia usan solo ReadOnlyDAO
+public class ArticuloEstatutoDAO implements ReadOnlyDAO<ArticuloEstatuto, Integer> { ... }
+
+// Las entidades del dominio usan GenericDAO completo
+public class FacultadJsonDAO implements GenericDAO<Facultad, String> { ... }
+\end{lstlisting}
+
+\subsection{DIP: Inversión de dependencias}
+\label{subsec:solid-dip}
+
+El principio de inversión de dependencias requiere que las clases de alto nivel ---los
+controladores--- dependan de abstracciones (interfaces), no de implementaciones concretas.
+En el sistema del estatuto, \texttt{FacultadControlador} recibe su dependencia de acceso
+a datos mediante inyección en el constructor, lo que permite sustituir \texttt{FacultadJsonDAO}
+por \texttt{FacultadMemoriaDAO} en las pruebas sin modificar el controlador:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={DIP: controlador con dependencia inyectada sobre interfaz.},
+  label={lst:dip-controlador}]
+public class FacultadControlador {
+    // Depende de la abstraccion, no de la implementacion concreta
+    private final GenericDAO<Facultad, String> dao;
+
+    // Inyeccion de dependencias por constructor
+    public FacultadControlador(GenericDAO<Facultad, String> dao) {
+        this.dao = Objects.requireNonNull(dao);
+    }
+
+    public Facultad buscarFacultad(String codigo) {
+        return dao.buscarPorId(codigo)
+                  .orElseThrow(() -> new EntidadNoEncontradaException(
+                      "Facultad con codigo " + codigo + " no encontrada."));
+    }
+}
+
+// En pruebas: inyectar un DAO en memoria, no el DAO JSON real
+class FacultadControladorTest {
+    @Test
+    void buscarFacultadExistenteRetornaEntidad() {
+        GenericDAO<Facultad, String> daoMock = new FacultadMemoriaDAO();
+        daoMock.guardar(new Facultad("FI", "FI-001", LocalDate.now(), "D"));
+        FacultadControlador ctrl = new FacultadControlador(daoMock);
+        assertNotNull(ctrl.buscarFacultad("FI-001"));
+    }
+}
+\end{lstlisting}
+
+
+%% ─────────────────────────────────────────────
+\section{Documentación del código (Javadoc, rustdoc)}
+\label{sec:documentacion}
+%% ─────────────────────────────────────────────
+
+La documentación del código es, en el contexto del sistema del estatuto, un requisito de
+dominio además de una buena práctica de ingeniería: toda entidad del sistema tiene un
+correlato normativo en el \acuerdo, y esa correspondencia debe quedar explícita en los
+comentarios de la clase o el \textit{struct}.\footnote{El autor considera que la documentación
+más valiosa en código orientado a dominio no es la que describe \emph{cómo} hace algo un
+método, sino \emph{por qué} el dominio exige ese comportamiento. La referencia explícita
+al artículo del estatuto aplicable, tal como se muestra en los listados siguientes, es un
+ejemplo de esa práctica.}
+
+\subsection{Javadoc: documentación de \texttt{Facultad}}
+\label{subsec:javadoc-facultad}
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Documentación Javadoc completa para la clase \texttt{Facultad}.},
+  label={lst:javadoc-facultad}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.time.LocalDate;
+import java.util.*;
+
+/**
+ * Representa una Facultad de la Universidad Distrital Francisco José de Caldas.
+ *
+ * <p>Conforme al artículo~5 del Acuerdo 004 de 2025 (Estatuto General), una Facultad
+ * es la unidad académico-administrativa de mayor jerarquía en la estructura de la
+ * universidad. Agrupa Escuelas, Centros e Institutos bajo la dirección de un Decano
+ * designado por el Consejo Superior Universitario.</p>
+ *
+ * <p><strong>Invariantes del dominio:</strong></p>
+ * <ul>
+ *   <li>El código institucional no puede ser nulo ni vacío; se normaliza a mayúsculas.</li>
+ *   <li>Una Facultad puede tener cero o más Escuelas asociadas.</li>
+ *   <li>El Decano es un dato obligatorio en el momento de creación.</li>
+ * </ul>
+ *
+ * @author Roberto Albeiro Pava-Díaz
+ * @version 2.0
+ * @since Estatuto General 2025 (Acuerdo 004 de 2025)
+ * @see UnidadAcademica
+ * @see Escuela
+ */
+public class Facultad extends UnidadAcademica {
+
+    /** Lista de Escuelas adscritas a esta Facultad. Puede estar vacía. */
+    private final List<Escuela> escuelas;
+
+    /**
+     * Construye una Facultad con sus datos básicos.
+     *
+     * @param nombre        nombre oficial de la Facultad (p.~ej., "Facultad de Ingeniería")
+     * @param codigo        código institucional único (se normaliza a mayúsculas; no nulo ni vacío)
+     * @param fechaCreacion fecha de creación o reconocimiento oficial
+     * @param director      nombre del Decano vigente (no nulo)
+     * @throws IllegalArgumentException si el código es nulo o vacío
+     * @throws NullPointerException     si nombre, fechaCreacion o director son nulos
+     */
+    public Facultad(String nombre, String codigo,
+                    LocalDate fechaCreacion, String director) {
+        super(nombre, codigo, fechaCreacion, director);
+        this.escuelas = new ArrayList<>();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return la cadena {@code "Facultad"}, identificador del tipo de unidad
+     */
+    @Override
+    public String getTipo() { return "Facultad"; }
+
+    /**
+     * Asocia una Escuela a esta Facultad.
+     *
+     * <p>La unicidad de la asociación se garantiza por comparación de código institucional.
+     * Si la Escuela ya está asociada, el método retorna sin modificar la lista.</p>
+     *
+     * @param escuela la Escuela que se desea asociar (no nula)
+     * @throws NullPointerException si {@code escuela} es {@code null}
+     */
+    public void addEscuela(Escuela escuela) {
+        Objects.requireNonNull(escuela, "La escuela no puede ser nula.");
+        if (!escuelas.contains(escuela)) escuelas.add(escuela);
+    }
+
+    /**
+     * Retorna una vista no modificable de las Escuelas asociadas.
+     *
+     * @return lista inmutable de Escuelas; nunca {@code null}
+     */
+    public List<Escuela> getEscuelas() {
+        return Collections.unmodifiableList(escuelas);
+    }
+
+    /**
+     * Calcula el promedio de docentes por Escuela.
+     *
+     * @return promedio aritmético de docentes por Escuela, o {@code 0.0} si
+     *         no hay Escuelas asociadas
+     */
+    public double calcularPromedioDocentes() {
+        if (escuelas.isEmpty()) return 0.0;
+        return escuelas.stream()
+                       .mapToInt(e -> e.getDocentes().size())
+                       .average()
+                       .orElse(0.0);
+    }
+}
+\end{lstlisting}
+
+\subsection{rustdoc: documentación de \texttt{Facultad}}
+\label{subsec:rustdoc-facultad}
+
+\begin{lstlisting}[style=rustStyle,
+  caption={Documentación \texttt{rustdoc} completa para el \textit{struct} \texttt{Facultad}.},
+  label={lst:rustdoc-facultad}]
+/// Representa una Facultad de la Universidad Distrital Francisco José de Caldas.
+///
+/// Conforme al artículo 5 del Acuerdo 004 de 2025 (Estatuto General), una Facultad
+/// es la unidad académico-administrativa de mayor jerarquía en la estructura de la
+/// universidad. Agrupa Escuelas bajo la dirección de un Decano.
+///
+/// # Invariantes del dominio
+///
+/// - El `codigo` no puede estar vacío; se normaliza a mayúsculas en la construcción.
+/// - `escuelas_ids` puede ser un vector vacío, pero nunca `None`.
+/// - El `decano` es un campo obligatorio.
+///
+/// # Errores
+///
+/// [`Facultad::new`] retorna `Err(String)` si `codigo` o `nombre` están vacíos.
+///
+/// # Ejemplo
+///
+/// ```rust
+/// use chrono::NaiveDate;
+/// use modelo::Facultad;
+///
+/// let f = Facultad::new(
+///     "Facultad de Ingeniería".to_string(),
+///     "FI-001".to_string(),
+///     NaiveDate::from_ymd_opt(1948, 7, 20).unwrap(),
+///     "Decano Vigente".to_string(),
+/// ).expect("Facultad válida");
+///
+/// assert_eq!(f.tipo(), "Facultad");
+/// assert_eq!(f.codigo(), "FI-001");
+/// ```
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Facultad {
+    id: u32,
+    nombre: String,
+    codigo: String,
+    fecha_creacion: chrono::NaiveDate,
+    director: String,
+    escuelas_ids: Vec<u32>,
+}
+
+impl Facultad {
+    /// Construye una nueva Facultad validando los campos obligatorios.
+    ///
+    /// # Parámetros
+    ///
+    /// - `nombre`: nombre oficial de la Facultad.
+    /// - `codigo`: código institucional único (se normaliza a mayúsculas).
+    /// - `fecha_creacion`: fecha de creación o reconocimiento oficial.
+    /// - `director`: nombre del Decano vigente.
+    ///
+    /// # Errores
+    ///
+    /// Retorna `Err` si `codigo` o `nombre` son cadenas vacías o solo contienen espacios.
+    pub fn new(nombre: String, codigo: String,
+               fecha_creacion: chrono::NaiveDate,
+               director: String) -> Result<Self, String> {
+        validar_campo_obligatorio(&codigo, "codigo")?;
+        validar_campo_obligatorio(&nombre, "nombre")?;
+        Ok(Facultad {
+            id: generar_id(),
+            nombre: nombre.trim().to_string(),
+            codigo: codigo.trim().to_uppercase(),
+            fecha_creacion,
+            director,
+            escuelas_ids: Vec::new(),
+        })
+    }
+
+    /// Retorna el tipo de unidad académica.
+    ///
+    /// Siempre retorna `"Facultad"`.
+    pub fn tipo(&self) -> &str { "Facultad" }
+
+    /// Retorna el código institucional normalizado a mayúsculas.
+    pub fn codigo(&self) -> &str { &self.codigo }
+
+    /// Asocia una Escuela a esta Facultad por su identificador.
+    ///
+    /// Si el `id` ya estaba registrado, no se duplica.
+    pub fn agregar_escuela(&mut self, escuela: Escuela) -> Result<(), String> {
+        if !self.escuelas_ids.contains(&escuela.id()) {
+            self.escuelas_ids.push(escuela.id());
+        }
+        Ok(())
+    }
+}
+\end{lstlisting}
+
+\noindent
+Para generar la documentación HTML de \rust\ se emplea el comando \texttt{cargo doc -{}-open},
+que compila la documentación de todos los módulos del proyecto y la abre en el navegador.
+Los ejemplos incrustados en los bloques de código de la documentación (\textit{doc-tests})
+se ejecutan como pruebas ordinarias durante \texttt{cargo test}, lo que garantiza que los
+ejemplos de la documentación estén siempre sincronizados con el código real ---una
+ventaja que Javadoc no ofrece de forma nativa.
+
+
+%% ─────────────────────────────────────────────
+\section{Comparativa \java\ vs.\ \rust: ecosistema de pruebas y calidad}
+\label{sec:java-rust-pruebas}
+%% ─────────────────────────────────────────────
+
+Pese a que los principios de prueba unitaria son independientes del lenguaje ---un caso de
+prueba verifica una condición, de forma aislada, con un resultado determinista---, el
+ecosistema que rodea esas pruebas difiere de manera notable entre \java\ y \rust. Esas
+diferencias inciden sobre la curva de aprendizaje, la integración en flujos de trabajo
+de desarrollo continuo y la accesibilidad para estudiantes de pregrado con experiencia limitada.
+
+\begingroup
+\small
+\begin{longtable}{@{} L{3cm} L{4.5cm} L{4.5cm} L{1.5cm} @{}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Ecosistema de pruebas y calidad: \java\ vs.\ \rust\ (comparativa).} \label{tab:ecosistema-pruebas} \\
+	\toprule
+	\textbf{Dimensión} & \textbf{\java\ + JUnit~5} & \textbf{\rust\ + \texttt{\#[test]}} & \textbf{Ventaja} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Dimensión} & \textbf{\java\ + JUnit~5} & \textbf{\rust\ + \texttt{\#[test]}} & \textbf{Ventaja} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	\textit{Framework} & 
+	JUnit~5 (dependencia externa vía Maven/Gradle) & 
+	Nativo en el compilador \texttt{rustc} y \texttt{cargo} & 
+	\rust \\
+	\midrule
+	
+	Pruebas de dobles & 
+	Mockito (estándar de facto, muy maduro en el ecosistema) & 
+	\texttt{mockall} (dependencia externa en \texttt{Cargo.toml}) & 
+	\java \\
+	\midrule
+	
+	Cobertura & 
+	JaCoCo + complemento de construcción Maven & 
+	\texttt{cargo-tarpaulin} (análisis de líneas ejecutadas) & 
+	Paridad \\
+	\midrule
+	
+	Análisis estático & 
+	SpotBugs, Checkstyle, SonarQube (muy robustos) & 
+	\texttt{clippy}, \texttt{cargo-audit} (integrados y rápidos) & 
+	\java \\
+	\midrule
+	
+	Configuración & 
+	Moderada (gestión de dependencias en \texttt{pom.xml}) & 
+	Mínima (soporte de primer nivel en \texttt{Cargo.toml}) & 
+	\rust \\
+	\midrule
+	
+	Integración CI/CD & 
+	Alta soporte en GitHub Actions, Jenkins y GitLab & 
+	Alta mediante \texttt{cargo test} en cualquier entorno CI & 
+	Paridad \\
+	\midrule
+	
+	Diagnóstico & 
+	Moderada (basada en \textit{stack traces} de la JVM) & 
+	Alta (mensajes detallados del compilador y \textit{panic}) & 
+	\rust \\
+	\midrule
+	
+	Curva de aprendizaje & 
+	Moderada (conceptos conocidos de la JVM y Maven) & 
+	Pronunciada (\textit{ownership} y \textit{borrow checker}) & 
+	\java \\
+	\midrule
+	
+	Madurez & 
+	Muy alta (más de 25 años de evolución estable) & 
+	Creciente y acelerada (desde la versión 1.0 en 2015) & 
+	\java \\
+\end{longtable}
+\endgroup
+
+\noindent
+La conclusión más llamativa de la comparativa no es cuál ecosistema es «mejor» en términos
+absolutos, sino cuál resulta más adecuado en función del perfil del equipo y del momento del
+aprendizaje. En las primeras semanas del proyecto, cuando los estudiantes están familiarizando-
+se con los conceptos de orientación a objetos, el ecosistema de \java\ ---más verboso pero
+más transparente en su configuración--- reduce la fricción cognitiva. En etapas avanzadas,
+cuando la corrección del código es prioritaria, el \textit{borrow checker} de \rust\ ofrece
+garantías en tiempo de compilación que ningún \textit{framework} de pruebas puede reemplazar.
+
+\subsection{Integración en flujos de CI/CD}
+\label{subsec:cicd}
+
+Ambos lenguajes integran con naturalidad en flujos de integración continua basados en
+GitHub Actions. El Listado~\ref{lst:github-actions} muestra un flujo mínimo que ejecuta
+pruebas en los dos lenguajes:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Flujo de GitHub Actions para pruebas en \java\ y \rust\ simultáneamente.},
+  label={lst:github-actions},
+  language=XML]
+name: CI — Pruebas Java y Rust
+
+on: [push, pull_request]
+
+jobs:
+  java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { java-version: '21', distribution: 'temurin' }
+      - run: cd proyecto_java && mvn verify
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cd proyecto_rust && cargo test --all
+      - run: cargo clippy -- -D warnings
+\end{lstlisting}
+
+
+%% ─────────────────────────────────────────────────────
+%% SPRINT 10
+%% ─────────────────────────────────────────────────────
+\section*{Sprint 10: Pruebas unitarias y cobertura}
+\label{sprint:10}
+\addcontentsline{toc}{section}{Sprint 10: Pruebas unitarias y cobertura}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 10 --- Pruebas unitarias y cobertura}]
+  \textbf{Duración estimada:} 1 semana (semanas~15--16 del semestre)\\
+  \textbf{Objetivo:} Implementar la batería de pruebas unitarias para los módulos
+  organizacional y académico del sistema en \java\ y en \rust, alcanzar al menos
+  80~\% de cobertura de línea en las clases del dominio, configurar JaCoCo y
+  \texttt{cargo-tarpaulin}, y documentar los casos de prueba en la matriz de trazabilidad
+  del proyecto.\\
+  \textbf{Prerequisito:} Código funcional de los Sprints~7 y~8 (Capítulos~\ref{cap:java}
+  y~\ref{cap:rust}), con al menos los módulos \texttt{modelo} y \texttt{controlador}
+  implementados y compilando sin errores.
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Tabla del Sprint 10}
+
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4.5cm}}
+  \sprintcabecera
+  \endhead
+  %
+  Clase \texttt{FacultadTest} en JUnit~5: mínimo 6 casos de prueba que cubran
+  constructor válido, código nulo, código vacío, addEscuela, igualdad y toString
+  &
+  Verificar las invariantes del dominio de la entidad organizacional de mayor
+  jerarquía, conforme al artículo~5 del \acuerdo
+  &
+  Todas las pruebas pasan con \texttt{mvn test}; la clase \texttt{FacultadTest}
+  cubre al menos 6 casos con \texttt{@DisplayName} descriptivos; reporte JaCoCo
+  indica $\geq 80$~\% de cobertura de línea en \texttt{Facultad} \\
+  \midrule
+  %
+  Clases \texttt{EscuelaTest}, \texttt{DocenteTest} y \texttt{EstudianteTest}
+  en JUnit~5: mínimo 5 casos de prueba cada una, incluyendo al menos 2 casos
+  con \texttt{assertThrows}
+  &
+  Verificar las invariantes de dominio de las entidades académicas y la
+  validez del enumerado \texttt{TipoVinculacion}
+  &
+  Todas las pruebas de las tres clases pasan; al menos un caso
+  \texttt{@ParameterizedTest} con \texttt{@EnumSource} verifica todos los
+  valores de \texttt{TipoVinculacion}; la cobertura de rama de \texttt{Docente}
+  supera el 70~\% \\
+  \midrule
+  %
+  Módulo de pruebas \rust\ (\texttt{\#[cfg(test)]}) para \texttt{Facultad},
+  \texttt{Escuela} y \texttt{Docente}: mínimo 4 casos por \textit{struct},
+  incluyendo al menos 1 con \texttt{\#[should\_panic]}
+  &
+  Aplicar el mecanismo nativo de pruebas de \rust\ al dominio del estatuto,
+  verificando las mismas invariantes que en \java\ con las herramientas de sintaxis del
+  lenguaje
+  &
+  \texttt{cargo test} pasa sin fallos; al menos 1 \textit{doc-test} en la
+  documentación de \texttt{Facultad} se ejecuta y pasa; salida de
+  \texttt{cargo tarpaulin} indica $\geq 75$~\% de cobertura \\
+  \midrule
+  %
+  Reporte de cobertura JaCoCo integrado en Maven (\texttt{mvn verify}) con
+  umbrales configurados: 80~\% línea y 70~\% rama para el paquete
+  \texttt{modelo}; construcción falla si no se alcanzan los umbrales
+  &
+  Institucionalizar la cobertura como umbral de calidad verificable
+  automáticamente en cada ciclo de integración
+  &
+  El archivo \texttt{pom.xml} incluye la configuración de JaCoCo con los
+  umbrales documentados; \texttt{mvn verify} falla con mensaje claro si la
+  cobertura es insuficiente; el reporte HTML se genera en
+  \texttt{target/site/jacoco/} \\
+  \midrule
+  %
+  Matriz de trazabilidad prueba--invariante--artículo: tabla que relaciona
+  cada caso de prueba con la invariante que verifica y el artículo del
+  \acuerdo\ del que se deriva
+  &
+  Documentar la correspondencia entre los casos de prueba automatizados y las
+  restricciones normativas del estatuto universitario
+  &
+  La tabla cubre al menos 15 casos de prueba; cada fila identifica la prueba,
+  la invariante verificada y el artículo del \acuerdo; el documento se
+  adjunta al repositorio en \texttt{docs/trazabilidad\_pruebas.md} \\
+  \bottomrule
+  \caption{Entregables, características y rúbrica del Sprint~10.}
+  \label{tab:sprint10}
+\end{longtable}
+
+\subsection*{Actividad de reflexión: software generativo y pruebas unitarias}
+\label{act:ia-sprint10}
+
+\begin{tcolorbox}[actividadIA,
+  title={Actividad de reflexión (Sprint~10) ---
+         Software generativo y pruebas unitarias}]
+
+\textbf{Instrucción general.}
+El estudiante diseña y escribe de manera individual las pruebas unitarias de la clase
+\texttt{Facultad}, identificando previamente las invariantes del dominio que deben
+verificarse y consultando el \acuerdo. A continuación, solicita a un asistente generativo
+(por ejemplo, GitHub Copilot, ChatGPT o Claude) que genere las mismas pruebas para la misma
+clase, proporcionándole únicamente el código fuente de \texttt{Facultad} como contexto.
+El estudiante compara ambos conjuntos de pruebas y elabora un informe de análisis crítico.
+
+\bigskip
+\textbf{Preguntas orientadoras:}
+\begin{enumerate}[label=\arabic*.]
+  \item ¿El asistente generativo produce pruebas que verifican invariantes del dominio
+        institucional (código no nulo, normalización a mayúsculas, unicidad de adscripción)
+        o se limita a pruebas triviales de \textit{getters} y \textit{setters}?
+  \item ¿Las pruebas generadas son independientes entre sí, o presentan dependencias de
+        orden de ejecución que podrían generar fallos intermitentes?
+  \item ¿El asistente asigna nombres descriptivos que comunican la intención del caso de
+        prueba (\texttt{codigoNuloLanzaIllegalArgumentException}) o usa nombres genéricos
+        (\texttt{test1}, \texttt{testConstructor})?
+  \item ¿Hay pruebas que el asistente omitió y que el estudiante identificó a partir de
+        la lectura del \acuerdo? ¿A qué atribuye esa omisión?
+  \item ¿Las pruebas generadas por el asistente compilarían y pasarían con el código de
+        producción actual, o requieren ajustes antes de poder ejecutarse?
+\end{enumerate}
+
+\bigskip
+\textbf{Producto esperado:}
+\begin{itemize}
+  \item Clase \texttt{FacultadTest} escrita por el estudiante (en el repositorio).
+  \item Transcripción o captura de pantalla de la sesión con el asistente generativo.
+  \item Informe comparativo de 400--600 palabras que responda las preguntas orientadoras
+        con evidencia concreta de los dos conjuntos de pruebas.
+\end{itemize}
+
+\bigskip
+\textbf{Rúbrica:}
+\begin{itemize}
+  \item \textbf{Producto} (60~\%): cobertura de invariantes del dominio, independencia
+        de los casos de prueba, nomenclatura descriptiva, ausencia de código duplicado.
+  \item \textbf{Proceso} (40~\%): identificación de pruebas faltantes en la propuesta
+        del asistente, análisis crítico fundamentado, conclusión sobre la utilidad
+        y las limitaciones del asistente generativo para esta tarea.
+\end{itemize}
+
+\end{tcolorbox}
+
+
+%% ─────────────────────────────────────────────────────
+%% SPRINT 11
+%% ─────────────────────────────────────────────────────
+\section*{Sprint 11: Refactorización y principios SOLID}
+\label{sprint:11}
+\addcontentsline{toc}{section}{Sprint 11: Refactorización y principios SOLID}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 11 --- Refactorización y principios SOLID}]
+  \textbf{Duración estimada:} 1 semana (semanas~17--18 del semestre)\\
+  \textbf{Objetivo:} Refactorizar el código de los módulos organizacional y académico
+  aplicando al menos tres principios SOLID, documentar las refactorizaciones con tarjetas
+  antes/después siguiendo el formato del catálogo de Fowler \parencite{Fowler2018}, y
+  verificar que la batería de pruebas del Sprint~10 sigue pasando íntegramente tras
+  cada refactorización.\\
+  \textbf{Prerequisito:} Batería de pruebas del Sprint~10 completa y en verde
+  (\texttt{mvn test} y \texttt{cargo test} pasan sin fallos).
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Tabla del Sprint 11}
+
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4.5cm}}
+  \sprintcabecera
+  \endhead
+  %
+  Informe de refactorización con mínimo 5 tarjetas (nombre / motivación / mecánica
+  / antes / después) sustentadas en principios SOLID; cada tarjeta incluye fragmentos
+  de código en \java\ \emph{y} en \rust
+  &
+  Aplicar técnicas de refactorización al código del dominio institucional con
+  fundamentación en el catálogo de Fowler y los principios SOLID; demostrar
+  que la técnica es independiente del lenguaje
+  &
+  Las tarjetas identifican correctamente el problema de diseño, justifican la
+  refactorización con un principio SOLID nombrado explícitamente, y documentan el
+  cambio con fragmentos de código antes/después; el código resultante compila
+  sin errores en ambos lenguajes \\
+  \midrule
+  %
+  Batería de pruebas del Sprint~10 ejecutada sin cambios y pasando tras cada
+  refactorización; evidencia: captura de reporte de ejecución antes y después
+  &
+  Garantizar que la refactorización no introduce regresiones; demostrar que
+  una batería de pruebas sólida es el andamiaje que hace posible la refactorización
+  segura
+  &
+  Todas las pruebas del Sprint~10 pasan tras la refactorización; el reporte de
+  cobertura JaCoCo no decrece con respecto al obtenido antes de la refactorización;
+  ambas capturas (antes y después) se adjuntan al informe \\
+  \midrule
+  %
+  Evaluación de los cinco principios SOLID frente al código del sistema: tabla
+  que identifica, para cada principio, si se cumple, se cumple parcialmente o
+  se viola, con justificación y referencia al código
+  &
+  Desarrollar la capacidad de evaluar críticamente el diseño de un sistema real
+  frente a criterios de calidad establecidos
+  &
+  La tabla es completa (cinco principios), la justificación es específica
+  (referencia a clases e interfaces concretas del sistema), y las valoraciones
+  son coherentes con el código entregado en el repositorio \\
+  \midrule
+  %
+  Documentación Javadoc y rustdoc actualizada tras la refactorización: todas
+  las clases y \textit{structs} del módulo \texttt{modelo} tienen documentación
+  en el formato descrito en la sección~\ref{sec:documentacion}
+  &
+  Mantener la documentación sincronizada con el código, incluyendo la referencia
+  al artículo del estatuto aplicable en cada entidad del dominio
+  &
+  \texttt{mvn javadoc:javadoc} genera documentación sin advertencias;
+  \texttt{cargo doc} genera documentación sin errores; al menos el 80~\%
+  de los métodos públicos tienen documentación con \texttt{@param}, \texttt{@return}
+  y \texttt{@throws} (Javadoc) o sección \textbf{Errores} (rustdoc) \\
+  \midrule
+  %
+  Análisis de complejidad ciclomática: al menos un método del módulo \texttt{modelo}
+  con CC~$>$~5 antes de la refactorización; evidencia de que la refactorización
+  redujo la CC al umbral adoptado ($\leq 8$ para clases de dominio)
+  &
+  Aplicar métricas cuantitativas de calidad para fundamentar decisiones de
+  refactorización; no refactorizar por intuición, sino por evidencia medible
+  &
+  El informe incluye la CC del método antes y después de la refactorización;
+  la medición se obtiene de SonarQube (para \java) o de \texttt{cargo clippy}
+  con la opción \texttt{-{}-warn complexity} (para \rust) \\
+  \bottomrule
+  \caption{Entregables, características y rúbrica del Sprint~11.}
+  \label{tab:sprint11}
+\end{longtable}
+
+\subsection*{Actividad de reflexión: software generativo y refactorización}
+\label{act:ia-sprint11}
+
+\begin{tcolorbox}[actividadIA,
+  title={Actividad de reflexión (Sprint~11) ---
+         Software generativo y refactorización}]
+
+\textbf{Instrucción general.}
+El estudiante identifica de manera individual una violación del principio abierto/cerrado
+(OCP) o del principio de responsabilidad única (SRP) en el código desarrollado en los
+sprints anteriores, y la refactoriza aplicando la técnica del catálogo de Fowler que
+considere más adecuada. A continuación, describe el problema al asistente generativo
+---incluyendo el fragmento de código con el problema--- y solicita una propuesta de
+refactorización alternativa. El estudiante compara su solución con la del asistente.
+
+\bigskip
+\textbf{Preguntas orientadoras:}
+\begin{enumerate}[label=\arabic*.]
+  \item ¿La refactorización propuesta por el asistente aplica la técnica correcta del
+        catálogo de Fowler para el tipo de problema identificado, o propone una técnica
+        diferente? ¿Cuál es más adecuada y por qué?
+  \item ¿La propuesta del asistente preserva el comportamiento externo del código,
+        verificable mediante las pruebas del Sprint~10, o introduce cambios de semántica
+        que haría fallar alguna prueba?
+  \item ¿El asistente identifica en el código problemas de diseño adicionales que el
+        estudiante no había observado? ¿Son esos problemas legítimos o son ruido?
+  \item ¿La solución del asistente introduce dependencias nuevas no justificadas,
+        incrementa la complejidad ciclomática o viola algún otro principio SOLID?
+  \item En retrospectiva: ¿hubiese sido posible evitar el problema de diseño identificado
+        si se hubieran aplicado los principios SOLID desde el Sprint~7?
+\end{enumerate}
+
+\bigskip
+\textbf{Producto esperado:}
+\begin{itemize}
+  \item Tarjeta de refactorización propia (nombre / motivación / mecánica / antes / después).
+  \item Propuesta del asistente generativo (transcripción o captura de pantalla).
+  \item Informe comparativo de 400--600 palabras que responda las cinco preguntas
+        orientadoras con evidencia concreta del código.
+  \item Evidencia de que las pruebas del Sprint~10 siguen pasando tras la refactorización.
+\end{itemize}
+
+\bigskip
+\textbf{Rúbrica:}
+\begin{itemize}
+  \item \textbf{Producto} (60~\%): corrección de la refactorización propia, preservación
+        del comportamiento, aplicación correcta del principio SOLID, calidad del código
+        resultante.
+  \item \textbf{Proceso} (40~\%): evaluación crítica de la propuesta del asistente,
+        identificación de fortalezas y debilidades, capacidad de argumentar la decisión
+        de diseño adoptada.
+\end{itemize}
+
+\end{tcolorbox}
+
+\bigskip
+
+%% ─────────────────────────────────────────────
+%% CIERRE DEL CAPÍTULO
+%% ─────────────────────────────────────────────
+
+\noindent
+Los dos sprints de este capítulo cierran el ciclo de desarrollo principal del sistema
+del estatuto.\footnote{La integración entre las herramientas de análisis estático
+---SonarQube para \java, \texttt{clippy} para \rust--- y los flujos de CI/CD descritos
+en la sección~\ref{subsec:cicd} puede resultar compleja para equipos sin experiencia
+previa. El autor recomienda introducir SonarQube en una instalación local (Docker) antes
+de intentar la integración con el servidor de CI, de manera que los estudiantes comprendan
+la interfaz de usuario antes de interpretar los reportes en el \textit{pipeline}.} La batería
+de pruebas construida en el Sprint~10 no es un producto estático: debe crecer junto con el
+código, de modo que cada nueva funcionalidad incorpore su correspondiente caso de prueba.
+La refactorización del Sprint~11, a su vez, no es un ejercicio de cosmética del código,
+sino la demostración práctica de que el diseño orientado a objetos es un proceso iterativo
+que se afina con la experiencia y con la retroalimentación que solo las pruebas automatizadas
+pueden proporcionar de forma fiable.
+
+Persiste, sin embargo, una duda que el autor no desea soslayar: la refactorización guiada
+por principios SOLID puede conducir a una proliferación de clases e interfaces que incrementa
+la complejidad estructural sin beneficio proporcional en mantenibilidad. La regla práctica
+adoptada en la cátedra ---no crear una abstracción hasta que existan al menos dos implementaciones
+concretas--- no es universal, pero sí ha probado ser útil en proyectos de alcance universitario
+donde el tiempo de desarrollo es el recurso más escaso. El Capítulo~\ref{cap:rust} complementa
+esta perspectiva desde el punto de vista del sistema de tipos de \rust, que impone disciplina
+de diseño no mediante principios abstractos, sino mediante restricciones del compilador.

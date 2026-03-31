@@ -1,0 +1,1027 @@
+%% ============================================================
+%% cap02.tex — Capítulo 2
+%% Requisitos del sistema de información
+%% ============================================================
+
+\chapter{Requisitos del sistema de información}
+\label{cap:requisitos}
+
+\noindent
+Toda vez que el diseño orientado a objetos parte necesariamente de una
+comprensión acuciosa del dominio del problema, el presente capítulo
+se ocupa del análisis y la especificación de los requisitos del sistema
+de información para el Estatuto General y el Estatuto Académico de la
+\ud. El proceso de levantamiento de requisitos ---estructurado en los
+Sprints~2 y 3--- no es un trámite burocrático previo al ``verdadero''
+trabajo de programación: es, en sí mismo, un acto de modelado conceptual
+que determina la calidad de las abstracciones que se construirán en los
+capítulos subsiguientes.\footnote{%
+  \textcite{Larman2004} sostiene que el análisis del dominio es el paso
+  más crítico ---y con frecuencia el más descuidado--- en el desarrollo
+  orientado a objetos. Un modelo de dominio deficiente propaga sus errores
+  a lo largo de todas las fases del proyecto; los errores detectados en
+  la fase de requisitos cuestan, en promedio, diez veces menos que los
+  detectados en la fase de implementación \autocite{Pressman2014}.}
+De suerte que la decisión de dedicar un capítulo completo a los requisitos
+antes de escribir una sola línea de código expresa una convicción
+pedagógica, no un protocolo rutinario.
+
+%% ─────────────────────────────────────────────
+\section{Análisis del dominio académico-administrativo}
+\label{sec:analisis-dominio}
+%% ─────────────────────────────────────────────
+
+Se aplican técnicas de análisis del dominio ---glosarios, análisis de
+documentos normativos, identificación de actores y procesos--- al corpus
+compuesto por el \acuerdo, la propuesta de Estatuto Académico (noviembre
+de 2025) y el documento de -PFA- de la \ud\ (2023). El objetivo es producir
+un modelo conceptual preliminar que sirva de insumo para la especificación
+formal de requisitos y, posteriormente, para el diagrama de clases del
+dominio (Capítulo~\ref{cap:uml}).
+
+\subsection{Identificación de actores y roles}
+\label{subsec:actores-roles}
+
+La Tabla~\ref{tab:actores-sistema} enumera los actores del sistema, con
+referencia a los artículos del estatuto que los definen y a la necesidad
+principal que cada uno tiene respecto del sistema de información.
+
+\begin{longtable}{L{2.5cm} L{2.5cm} L{4cm} C{2cm}}
+  \toprule
+  \textbf{Actor} & \textbf{Rol en el sistema} &
+  \textbf{Necesidad principal} & \textbf{Art.\ del estatuto} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Actores del sistema de información y sus necesidades principales.
+    Fuente: elaboración del autor con base en el \acuerdo.}
+  \label{tab:actores-sistema}
+  \endlastfoot
+  Rector
+  & Administrador institucional de máximo nivel
+  & Consultar estado general de la institución; emitir resoluciones y acuerdos
+  & Arts.\ 6, 18 \\
+  \midrule
+  Decano
+  & Administrador de Facultad
+  & Gestionar Facultad y sus dependencias; convocar Consejo de Facultad
+  & Arts.\ 18, 49 \\
+  \midrule
+  Director de Escuela
+  & Administrador de Escuela
+  & Gestionar docentes adscritos; asignar carga académica; convocar Consejo de Escuela
+  & Arts.\ 15, 18 \\
+  \midrule
+  Director de Programa
+  & Coordinador académico de un programa
+  & Gestionar plan de estudios; matricular estudiantes; gestionar evaluación y -PFA-
+  & Arts.\ 18, 49 \\
+  \midrule
+  Coordinador de -CABA-
+  & Coordinador de área de formación
+  & Articular docencia e investigación en el área; gestionar actividades del -CABA-
+  & Art.\ 19 \\
+  \midrule
+  Docente
+  & Orientador de espacios académicos
+  & Consultar asignación de espacios académicos; registrar evaluaciones y evidencias
+  & Arts.\ 8, 15 \\
+  \midrule
+  Estudiante
+  & Beneficiario del proceso formativo
+  & Consultar matrícula; consultar calificaciones; acceder a información del programa
+  & Arts.\ 8, 18 \\
+  \midrule
+  Personal administrativo
+  & Operador del sistema en procesos administrativos
+  & Gestionar matrículas, certificados, registros académicos
+  & Art.\ 8 \\
+  \midrule
+  Egresado
+  & Ex-miembro de la comunidad con derechos residuales
+  & Consultar historial académico; solicitar certificaciones
+  & Art.\ 8 \\
+  \midrule
+  Auditor interno
+  & Actor externo de control
+  & Consultar trazabilidad de decisiones de órganos colegiados; generar reportes de cumplimiento
+  & (Implícito en el marco normativo) \\
+\end{longtable}
+
+\subsection{Procesos académicos derivados del Estatuto}
+\label{subsec:procesos-academicos}
+
+La Tabla~\ref{tab:procesos-academicos} mapea los procesos académico-administrativos
+regulados por el estatuto que generan requisitos funcionales para el sistema,
+con indicación de los actores involucrados y los datos que cada proceso
+consume y produce.
+
+\begin{longtable}{L{2.8cm} L{2.8cm} L{2.8cm} L{3cm}}
+  \toprule
+  \textbf{Proceso} & \textbf{Actores involucrados} &
+  \textbf{Datos de entrada} & \textbf{Datos de salida} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Procesos académicos del dominio con actores, entradas y salidas.}
+  \label{tab:procesos-academicos}
+  \endlastfoot
+  Matrícula de estudiante
+  & Estudiante, Personal administrativo, Director de Programa
+  & Datos del aspirante; oferta académica vigente; requisitos del programa
+  & Registro de matrícula; código de estudiante; estado ``activo'' \\
+  \midrule
+  Adscripción de docente a Escuela
+  & Director de Escuela, Decano, Personal administrativo
+  & Datos del docente; tipo de vinculación; Escuela de destino
+  & Registro de adscripción; actualización del listado de la Escuela \\
+  \midrule
+  Asignación de espacios académicos
+  & Director de Escuela, Docente
+  & Plan de estudios vigente; disponibilidad docente; horarios
+  & Asignación de docente a espacio académico; carga horaria \\
+  \midrule
+  Gestión del plan de estudios
+  & Director de Programa, Consejo de Facultad
+  & PEP vigente; espacios académicos; créditos; prerrequisitos
+  & Plan de estudios actualizado; resolución de aprobación \\
+  \midrule
+  Registro de evaluación y -PFA-
+  & Docente, Director de Programa
+  & Rúbrica de evaluación; evidencias de aprendizaje; -PFA- del programa
+  & Calificaciones registradas; informe de avance del estudiante frente a RA \\
+  \midrule
+  Sesión de órgano colegiado
+  & Rector / Decano / Director (según órgano), representantes de la comunidad
+  & Convocatoria; orden del día; quórum
+  & Acta de sesión; decisiones (acuerdos, resoluciones) \\
+  \midrule
+  Creación de unidad académica
+  & Rector, Consejo Superior (para Facultades); Decano, Consejo de Facultad
+    (para Escuelas)
+  & Estudio de factibilidad; resolución de creación
+  & Nueva unidad registrada en el sistema; actualización de la jerarquía
+    organizacional \\
+\end{longtable}
+
+%% ─────────────────────────────────────────────
+\section{Requisitos funcionales}
+\label{sec:req-funcionales}
+%% ─────────────────────────────────────────────
+
+Los requisitos funcionales del sistema se especifican en cinco grupos
+correspondientes a los cinco subsistemas identificados en la
+Sección~\ref{sec:caso-estudio}. La notación es RF-NNN, donde NNN
+es un número secuencial de tres dígitos. Para cada requisito se indica
+prioridad según el esquema MoSCoW: M (\textit{Must have}), S
+(\textit{Should have}), C (\textit{Could have}).
+
+\subsection{Gestión de estructura organizacional}
+\label{subsec:req-organizacional}
+
+\begin{longtable}{C{1.4cm} L{2.5cm} L{5cm} C{1.3cm} L{1.8cm}}
+  \toprule
+  \textbf{ID} & \textbf{Nombre} & \textbf{Descripción} &
+  \textbf{Prior.} & \textbf{Subsistema} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Requisitos funcionales: subsistema de gestión organizacional
+    (RF-001 a RF-004). Fuente: \acuerdo, Arts.\ 14--19.}
+  \label{tab:rf-organizacional}
+  \endlastfoot
+  RF-001
+  & Registrar unidad académica
+  & El sistema debe permitir registrar una nueva Facultad, Escuela, Centro,
+    Instituto o CABA con sus atributos normativos (nombre, código, fecha de
+    creación, director), validando que no exista duplicación de código
+    y que la jerarquía organizacional sea coherente con el \acuerdo
+  & M
+  & SS-1 \\
+  \midrule
+  RF-002
+  & Consultar estructura organizacional
+  & El sistema debe permitir consultar la estructura completa de la \ud\
+    de forma jerárquica (árbol Facultad $\rightarrow$ Escuela $\rightarrow$
+    CABA), con filtros por nivel, nombre y estado (activa/inactiva)
+  & M
+  & SS-1 \\
+  \midrule
+  RF-003
+  & Actualizar datos de unidad académica
+  & El sistema debe permitir actualizar los atributos de una unidad
+    académica existente, registrando la fecha y el actor responsable del
+    cambio; las modificaciones deben dejar trazabilidad de auditoría
+  & S
+  & SS-1 \\
+  \midrule
+  RF-004
+  & Gestionar directivos de unidades
+  & El sistema debe permitir registrar y actualizar el directivo
+    (decano, director de escuela, director de centro/instituto) de cada
+    unidad académica, con validación de que el directivo sea un docente
+    de planta adscrito a la institución
+  & S
+  & SS-1 \\
+\end{longtable}
+
+\subsection{Gestión de comunidad universitaria}
+\label{subsec:req-comunidad}
+
+\begin{longtable}{C{1.4cm} L{2.5cm} L{5cm} C{1.3cm} L{1.8cm}}
+  \toprule
+  \textbf{ID} & \textbf{Nombre} & \textbf{Descripción} &
+  \textbf{Prior.} & \textbf{Subsistema} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Requisitos funcionales: subsistema de gestión de comunidad
+    universitaria (RF-005 a RF-008). Fuente: \acuerdo, Art.\ 8.}
+  \label{tab:rf-comunidad}
+  \endlastfoot
+  RF-005
+  & Registrar docente con tipo de vinculación
+  & El sistema debe permitir registrar un docente con su tipo de vinculación
+    (planta, ocasional, hora cátedra, visitante o experto), adscribiendo\-lo
+    a exactamente una Escuela; los atributos requeridos difieren según
+    el tipo de vinculación
+  & M
+  & SS-2 \\
+  \midrule
+  RF-006
+  & Registrar y matricular estudiante
+  & El sistema debe permitir registrar un estudiante y asociarlo a un
+    programa académico mediante una matrícula; la matrícula registra el
+    período académico, el estado y el número de créditos vigentes
+  & M
+  & SS-2 \\
+  \midrule
+  RF-007
+  & Consultar comunidad universitaria
+  & El sistema debe permitir consultar los miembros de la comunidad
+    universitaria con filtros por tipo (docente, estudiante, personal
+    administrativo, egresado), unidad académica y estado de vinculación
+  & M
+  & SS-2 \\
+  \midrule
+  RF-008
+  & Gestionar egresados y certificaciones
+  & El sistema debe permitir registrar el cambio de estado de un estudiante
+    a egresado y generar certificaciones de grado, historia académica y
+    créditos cursados, con firma digital del Director de Registro
+  & S
+  & SS-2 \\
+\end{longtable}
+
+\subsection{Gestión de programas académicos y planes de estudio}
+\label{subsec:req-programas}
+
+\begin{longtable}{C{1.4cm} L{2.5cm} L{5cm} C{1.3cm} L{1.8cm}}
+  \toprule
+  \textbf{ID} & \textbf{Nombre} & \textbf{Descripción} &
+  \textbf{Prior.} & \textbf{Subsistema} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Requisitos funcionales: subsistema de gestión académica
+    (RF-009 a RF-012). Fuente: Estatuto Académico (propuesta), Arts.\ 13--18;
+    \textcite{Decreto1330_2019}.}
+  \label{tab:rf-academico}
+  \endlastfoot
+  RF-009
+  & Registrar programa académico
+  & El sistema debe permitir registrar un programa académico con su
+    código -SNIES-, nivel (pregrado/posgrado), denominación, área de
+    conocimiento, Facultad oferente y estado de registro calificado,
+    conforme al Decreto~1330 de 2019
+  & M
+  & SS-3 \\
+  \midrule
+  RF-010
+  & Gestionar plan de estudios
+  & El sistema debe permitir crear y versionar el plan de estudios de
+    un programa, con los espacios académicos (nombre, créditos, nivel
+    de formación, prerrequisitos, corequisitos) y la distribución por
+    semestres o períodos
+  & M
+  & SS-3 \\
+  \midrule
+  RF-011
+  & Asignar docente a espacio académico
+  & El sistema debe permitir asignar un docente a un espacio académico
+    en un período específico, validando que el docente esté adscrito a
+    la Escuela pertinente y que la carga horaria no supere los límites
+    definidos por el tipo de vinculación
+  & M
+  & SS-3 \\
+  \midrule
+  RF-012
+  & Gestionar PEP y documentos de política académica
+  & El sistema debe permitir registrar y versionar el Proyecto Educativo
+    de Programa (PEP), con referencia al PEF de la Facultad y al PUI
+    de la institución; cada versión debe registrar fecha de aprobación
+    y órgano que la aprobó
+  & S
+  & SS-3 \\
+\end{longtable}
+
+\subsection{Gestión de evaluación y resultados de aprendizaje}
+\label{subsec:req-evaluacion}
+
+\begin{longtable}{C{1.4cm} L{2.5cm} L{5cm} C{1.3cm} L{1.8cm}}
+  \toprule
+  \textbf{ID} & \textbf{Nombre} & \textbf{Descripción} &
+  \textbf{Prior.} & \textbf{Subsistema} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Requisitos funcionales: subsistema de gestión de evaluación y -PFA-
+    (RF-013 a RF-016). Fuente: Documento -PFA- \ud\ (2023);
+    \textcite{MEN2020_RA}.}
+  \label{tab:rf-evaluacion}
+  \endlastfoot
+  RF-013
+  & Definir Resultados de Aprendizaje por programa
+  & El sistema debe permitir formular Resultados de Aprendizaje (RA) para
+    un programa académico, con verbo de acción de la taxonomía de Bloom,
+    condición, criterio de desempeño y vinculación al perfil de egreso;
+    los RA deben ser observables y medibles \autocite{MEN2020_RA}
+  & M
+  & SS-4 \\
+  \midrule
+  RF-014
+  & Registrar -PFA- por espacio académico
+  & El sistema debe permitir registrar los Propósitos de Formación y de
+    Aprendizaje (-PFA-) de un espacio académico, diferenciados por ámbito
+    (ontológico, epistemológico, contextual), con vinculación a los RA
+    del programa al que pertenece el espacio
+  & M
+  & SS-4 \\
+  \midrule
+  RF-015
+  & Gestionar rúbricas de evaluación
+  & El sistema debe permitir crear rúbricas de evaluación con criterios,
+    niveles de desempeño (insuficiente, básico, alto, superior) y
+    ponderaciones; cada rúbrica se asocia a uno o más -PFA- del espacio
+    académico
+  & M
+  & SS-4 \\
+  \midrule
+  RF-016
+  & Registrar evidencias y calcular avance
+  & El sistema debe permitir al docente registrar evidencias de aprendizaje
+    para un estudiante en un espacio académico y calcular automáticamente
+    el nivel de avance del estudiante frente a los RA del programa;
+    el cálculo debe ser trazable hasta los criterios de la rúbrica
+  & S
+  & SS-4 \\
+\end{longtable}
+
+\subsection{Gestión de órganos colegiados y decisiones}
+\label{subsec:req-organos}
+
+\begin{longtable}{C{1.4cm} L{2.5cm} L{5cm} C{1.3cm} L{1.8cm}}
+  \toprule
+  \textbf{ID} & \textbf{Nombre} & \textbf{Descripción} &
+  \textbf{Prior.} & \textbf{Subsistema} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Requisitos funcionales: subsistema de gestión de órganos colegiados
+    (RF-017 a RF-020). Fuente: \acuerdo, Art.\ 18.}
+  \label{tab:rf-organos}
+  \endlastfoot
+  RF-017
+  & Registrar sesión de órgano colegiado
+  & El sistema debe permitir registrar una sesión de cualquier órgano
+    colegiado (Consejo Superior, Académico, de Facultad, Escuela, Centro
+    o Instituto) con convocatoria, quórum, orden del día y lista de asistentes
+  & M
+  & SS-5 \\
+  \midrule
+  RF-018
+  & Registrar decisiones (acuerdos y resoluciones)
+  & El sistema debe permitir registrar las decisiones adoptadas en una
+    sesión ---acuerdos y resoluciones, con número, fecha, extracto y
+    clasificación temática--- y vincularlas a las unidades académicas
+    o actores afectados
+  & M
+  & SS-5 \\
+  \midrule
+  RF-019
+  & Consultar historial de decisiones
+  & El sistema debe permitir consultar el historial de decisiones de
+    cualquier órgano colegiado, con filtros por fecha, tipo de decisión,
+    unidad afectada y estado (vigente/derogado)
+  & S
+  & SS-5 \\
+  \midrule
+  RF-020
+  & Generar reportes de cumplimiento normativo
+  & El sistema debe permitir generar reportes que evidencien el cumplimiento
+    de las disposiciones del \acuerdo\ y del Estatuto Académico, cruzando
+    las decisiones registradas con las obligaciones normativas derivadas
+    de cada artículo; útil para procesos de autoevaluación y renovación
+    de registro calificado
+  & C
+  & SS-5 \\
+\end{longtable}
+
+%% ─────────────────────────────────────────────
+\section{Requisitos no funcionales}
+\label{sec:req-no-funcionales}
+%% ─────────────────────────────────────────────
+
+Los requisitos no funcionales (-RNF-) establecen las condiciones de calidad
+bajo las cuales el sistema debe operar. En la medida en que el sistema
+implementará procesos normativos de una institución pública de educación
+superior, los requisitos de trazabilidad, seguridad y mantenibilidad
+adquieren carácter determinante. La Tabla~\ref{tab:rnf} los especifica.\footnote{%
+  La clasificación ISO/IEC 25010 (Quality Model for Software Product) se
+  emplea como referencia para las categorías de los -RNF-. Sin embargo,
+  la clasificación se adapta al dominio académico, priorizando las
+  categorías con mayor incidencia en las decisiones de diseño orientado
+  a objetos.}
+
+\begin{longtable}{C{1.6cm} L{1.8cm} L{5.5cm} L{3cm}}
+  \toprule
+  \textbf{ID} & \textbf{Categoría} & \textbf{Descripción} &
+  \textbf{Métrica de verificación} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Requisitos no funcionales del sistema (RNF-001 a RNF-008).
+    Categorías según ISO/IEC 25010.}
+  \label{tab:rnf}
+  \endlastfoot
+  RNF-001
+  & Rendimiento
+  & Las consultas sobre la estructura organizacional y los datos del
+    estudiante deben responder en tiempo inferior a 2 segundos para
+    hasta 5.000 usuarios concurrentes
+  & Prueba de carga con JMeter; p95 $\leq$ 2 s bajo 5.000 usuarios concurrentes \\
+  \midrule
+  RNF-002
+  & Seguridad (autenticación)
+  & El sistema debe implementar autenticación multifactor para los roles
+    con acceso a datos sensibles (rector, decano, director de programa,
+    personal administrativo); los docentes y estudiantes pueden autenticarse
+    con usuario y contraseña
+  & 100\% de usuarios con acceso a datos personales requieren MFA;
+    auditado en prueba de penetración \\
+  \midrule
+  RNF-003
+  & Seguridad (integridad de datos)
+  & Toda modificación de datos debe registrar al actor responsable,
+    la fecha y hora, y el valor anterior; los registros de auditoría
+    no pueden ser modificados ni eliminados por ningún actor del sistema
+  & Revisión de trazas de auditoría; prueba de intento de modificación
+    no autorizada \\
+  \midrule
+  RNF-004
+  & Usabilidad
+  & El sistema debe ser usable por personal administrativo sin formación
+    técnica especializada; el tiempo de aprendizaje para las tareas
+    más frecuentes no debe superar 2 horas
+  & Prueba de usabilidad con 5 usuarios no técnicos; tasa de error $\leq$ 10\%
+    en las 5 tareas más frecuentes \\
+  \midrule
+  RNF-005
+  & Portabilidad
+  & El sistema debe ejecutarse sin modificación de código en entornos
+    \textit{Linux} (Debian/Ubuntu) y \textit{Windows} 10/11; la versión
+    \java\ debe ser compatible con JDK 17 LTS o superior
+  & Ejecución de la suite de pruebas en ambos entornos sin fallos;
+    cero dependencias de sistema operativo específico \\
+  \midrule
+  RNF-006
+  & Mantenibilidad
+  & El código fuente debe cumplir los principios SOLID y lograr una
+    cobertura de pruebas unitarias superior al 80\%; la deuda técnica
+    medida con SonarQube no debe superar 5\% en el nivel ``crítico''
+  & Reporte SonarQube; métrica de cobertura con JaCoCo (Java) o Cargo tarpaulin (\rust) \\
+  \midrule
+  RNF-007
+  & Disponibilidad
+  & El sistema debe estar disponible el 99\% del tiempo en horario
+    hábil de la institución (lunes a viernes, 7:00--22:00); las
+    ventanas de mantenimiento se programarán en horario no hábil
+  & Monitoreo con herramienta de disponibilidad; registro de incidentes \\
+  \midrule
+  RNF-008
+  & Trazabilidad normativa
+  & Cada requisito funcional implementado debe estar vinculado a al menos
+    un artículo del \acuerdo\ o del Estatuto Académico; la trazabilidad
+    debe ser verificable mediante una matriz RF $\leftrightarrow$ artículo
+  & Matriz de trazabilidad RF $\leftrightarrow$ estatuto; revisión por pares
+    antes de cada entrega \\
+\end{longtable}
+
+%% ─────────────────────────────────────────────
+\section{Historias de usuario iniciales}
+\label{sec:historias-usuario}
+%% ─────────────────────────────────────────────
+
+Las historias de usuario del \textit{product backlog} inicial se formulan
+con la plantilla estándar: «Como [actor], quiero [funcionalidad], para que
+[valor de negocio]». Cada historia incluye criterios de aceptación
+verificables.\footnote{%
+  La elección del formato de historias de usuario, en lugar de casos de uso
+  formales de -UML-, obedece a una decisión pedagógica: los estudiantes de
+  primer semestre de la asignatura encuentran más accesible el lenguaje
+  natural de las historias. Los casos de uso formales se desarrollan en el
+  Capítulo~\ref{cap:uml} a partir de estas historias.}
+
+\bigskip
+
+\textbf{HU-001.} Como \textbf{Director de Escuela}, quiero registrar la
+adscripción de un nuevo docente a mi escuela, para que el sistema refleje
+la composición actualizada del cuerpo docente y la asignación de carga
+académica sea coherente con la planta disponible.
+
+\textit{Criterios de aceptación:}
+\begin{itemize}
+  \item El sistema valida que el tipo de vinculación sea uno de los cinco
+    definidos en el Art.\ 8 del \acuerdo\ (planta, ocasional, hora cátedra,
+    visitante, experto).
+  \item El sistema verifica que el docente no esté ya adscrito a otra
+    Escuela de la misma Facultad.
+  \item La adscripción queda registrada con fecha, actor responsable y
+    referencia al acto administrativo que la respalda.
+  \item El Director de Escuela recibe confirmación inmediata y puede
+    consultar la nueva nómina actualizada.
+\end{itemize}
+
+\bigskip
+
+\textbf{HU-002.} Como \textbf{Estudiante}, quiero consultar mi plan
+de estudios vigente con el estado de avance en cada espacio académico,
+para que pueda planificar los períodos académicos restantes para completar
+el programa.
+
+\textit{Criterios de aceptación:}
+\begin{itemize}
+  \item El sistema muestra el plan de estudios completo con semestres,
+    espacios académicos, créditos, prerrequisitos y estado de cada espacio
+    (pendiente, en curso, aprobado, reprobado).
+  \item El porcentaje de avance se calcula sobre el total de créditos del
+    programa.
+  \item La información está disponible en menos de 2 segundos (RNF-001).
+  \item El estudiante no puede modificar su plan de estudios mediante
+    esta funcionalidad; solo puede consultarlo.
+\end{itemize}
+
+\bigskip
+
+\textbf{HU-003.} Como \textbf{Docente}, quiero registrar las evidencias
+de aprendizaje de un estudiante en mi espacio académico con la rúbrica
+asociada, para que el seguimiento del avance del estudiante frente a los
+Resultados de Aprendizaje del programa sea trazable.
+
+\textit{Criterios de aceptación:}
+\begin{itemize}
+  \item El sistema presenta la rúbrica del espacio académico con sus criterios
+    y niveles de desempeño.
+  \item El docente puede seleccionar el nivel de desempeño para cada criterio
+    y adjuntar un archivo de evidencia (máx.\ 20 MB).
+  \item El sistema calcula automáticamente la calificación según la
+    ponderación de la rúbrica.
+  \item El registro queda sellado con fecha y hora; el docente puede modificarlo
+    hasta 48 horas después del registro inicial.
+\end{itemize}
+
+\bigskip
+
+\textbf{HU-004.} Como \textbf{Decano}, quiero consultar la estructura
+organizacional completa de mi Facultad ---Escuelas, Centros, Institutos
+y CABAS--- con el número de docentes adscritos a cada Escuela y el número
+de programas activos, para que pueda tomar decisiones informadas sobre
+la distribución de recursos humanos y académicos.
+
+\textit{Criterios de aceptación:}
+\begin{itemize}
+  \item El reporte muestra la jerarquía completa de la Facultad hasta el
+    nivel de CABA.
+  \item Para cada Escuela, muestra el número de docentes por tipo de vinculación.
+  \item Para cada programa activo, muestra el número de estudiantes matriculados
+    en el período vigente.
+  \item El reporte puede exportarse en formato PDF.
+\end{itemize}
+
+\bigskip
+
+\textbf{HU-005.} Como \textbf{Secretario de Consejo de Facultad}, quiero
+registrar los acuerdos adoptados en una sesión del Consejo de Facultad,
+para que las decisiones queden documentadas con trazabilidad normativa
+y puedan consultarse en procesos de autoevaluación.
+
+\textit{Criterios de aceptación:}
+\begin{itemize}
+  \item El registro incluye número de acuerdo, fecha, asunto, texto del
+    articulado y referencia a las entidades o personas afectadas.
+  \item Los registros de auditoría no pueden modificarse una vez guardados
+    (RNF-003).
+  \item El sistema vincula cada acuerdo a los artículos del \acuerdo\ que
+    lo fundamentan.
+  \item El listado de acuerdos puede consultarse con filtros por fecha,
+    tipo y estado (vigente/derogado).
+\end{itemize}
+
+\bigskip
+
+\textbf{HU-006.} Como \textbf{Director de Programa}, quiero registrar
+los Propósitos de Formación y de Aprendizaje (-PFA-) de cada espacio
+académico del programa, vinculados a los Resultados de Aprendizaje del
+plan de estudios, para que la evaluación formativa sea coherente con el
+proyecto educativo del programa.
+
+\textit{Criterios de aceptación:}
+\begin{itemize}
+  \item El sistema permite especificar -PFA- en los tres ámbitos (ontológico,
+    epistemológico, contextual) para cada espacio académico.
+  \item Cada -PFA- se vincula a al menos un Resultado de Aprendizaje del programa.
+  \item El sistema verifica que todos los RA del programa tengan al menos un
+    -PFA- vinculado en algún espacio del plan de estudios.
+  \item La configuración de -PFA- puede versionarse al inicio de cada período
+    académico.
+\end{itemize}
+
+\bigskip
+
+\textbf{HU-007.} Como \textbf{Personal administrativo}, quiero registrar
+la matrícula de un nuevo estudiante en un programa académico para el período
+vigente, para que el sistema académico refleje correctamente la población
+estudiantil activa y los cupos disponibles.
+
+\textit{Criterios de aceptación:}
+\begin{itemize}
+  \item El sistema verifica que el programa tenga cupos disponibles en el
+    período seleccionado.
+  \item La matrícula incluye: estudiante, programa, período, modalidad,
+    créditos inscritos y valor de matrícula.
+  \item El sistema genera automáticamente un código de matrícula único.
+  \item El estudiante queda con estado ``activo'' y puede consultar su
+    información académica.
+\end{itemize}
+
+\bigskip
+
+\textbf{HU-008.} Como \textbf{Rector}, quiero consultar un tablero de
+control con indicadores institucionales clave ---número de programas activos
+con registro calificado vigente, número de docentes por tipo de vinculación,
+número de estudiantes matriculados por Facultad, número de decisiones de
+órganos colegiados en el período--- para que la toma de decisiones
+estratégicas se sustente en datos actualizados.
+
+\textit{Criterios de aceptación:}
+\begin{itemize}
+  \item El tablero se actualiza en tiempo real a partir de los datos del
+    sistema.
+  \item Cada indicador puede desagregarse por Facultad, período académico
+    y tipo de vinculación.
+  \item El tablero puede compartirse en modo de solo lectura con el
+    Consejo Superior.
+  \item Los datos del tablero coinciden con los reportes de los subsistemas
+    individuales.
+\end{itemize}
+
+%% ─────────────────────────────────────────────
+\section{Modelo de contexto del sistema}
+\label{sec:modelo-contexto}
+%% ─────────────────────────────────────────────
+
+El diagrama de contexto establece los límites del sistema de información
+frente a los sistemas externos con los que interactúa y los actores
+que se relacionan directamente con él. Se representa en \plantuml\ como
+diagrama de casos de uso de alto nivel:
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de contexto del sistema de información de la \ud\
+    (PlantUML — nivel de contexto).},
+  label={lst:plantuml-contexto}]
+@startuml contexto_sistema
+skinparam actorStyle awesome
+skinparam rectangleBackgroundColor #F0F4FF
+skinparam arrowColor #00467F
+
+actor "Rector / Vicerrector" as rector
+actor "Decano" as decano
+actor "Director de Escuela" as director_escuela
+actor "Director de Programa" as director_programa
+actor "Docente" as docente
+actor "Estudiante" as estudiante
+actor "Personal administrativo" as admin
+
+rectangle "Sistema de Información UD\n(Estatuto General y Académico)" as SI {
+}
+
+rectangle "Sistemas externos" {
+  rectangle "Sistema de Nómina" as nomina
+  rectangle "MEN / SNIES" as snies
+  rectangle "Plataforma e-Learning" as elearning
+  rectangle "Sistema de Biblioteca" as biblioteca
+  rectangle "Sistema de Bienestar" as bienestar
+}
+
+rector --> SI : gestión institucional
+decano --> SI : gestión de Facultad
+director_escuela --> SI : gestión de Escuela y docentes
+director_programa --> SI : gestión académica y PFA
+docente --> SI : registro de evaluaciones
+estudiante --> SI : consulta académica
+admin --> SI : operación de registros
+
+SI --> nomina : datos de vinculación docente
+SI <-- nomina : confirmación de nómina
+SI --> snies : reporte de programas activos
+SI <-- elearning : actividades y evidencias
+SI --> biblioteca : solicitudes de recursos
+SI --> bienestar : datos de estudiantes en riesgo
+
+@enduml
+\end{lstlisting}
+
+Los flujos de información principales entre el sistema y los actores
+externos merecen una descripción sucinta. La integración con el sistema
+de nómina es de carácter bidireccional: el sistema de información
+reporta los datos de vinculación de los docentes y recibe confirmación
+del estado de nómina. La integración con el -SNIES- del Ministerio de
+Educación Nacional es unidireccional: el sistema genera los reportes
+de programas activos, estudiantes matriculados y egresados que la
+normativa colombiana obliga a reportar \autocite{Decreto1330_2019}.
+La plataforma de \textit{e-learning} ---cuya integración podría
+implementarse mediante una -API- -REST- en una fase posterior--- aportaría
+las evidencias de aprendizaje registradas en entornos virtuales, de suerte
+que el sistema de evaluación contaría con datos más completos para el
+cálculo del avance del estudiante frente a los RA. Queda por determinar
+si esta integración es prioritaria para una primera versión del sistema.
+
+%% ─────────────────────────────────────────────
+\section{Comparativa \java\ vs.\ \rust: impacto de los requisitos no funcionales}
+\label{sec:java-rust-requisitos}
+%% ─────────────────────────────────────────────
+
+Los requisitos no funcionales especificados en la Sección~\ref{sec:req-no-funcionales}
+condicionan de manera diferenciada las decisiones de implementación en
+\java\ y en \rust. Tres dimensiones resultan particularmente reveladoras.\footnote{%
+  Queda por determinar si la comparación entre \java\ y \rust\ desde la
+  perspectiva de los -RNF- es generalmente válida o si depende
+  excesivamente del dominio específico del sistema. En dominios con alta
+  concurrencia y requisitos estrictos de latencia, la ventaja de \rust\
+  sería más pronunciada; en dominios con predominio de operaciones
+  de entrada/salida y acceso a base de datos, la diferencia podría ser
+  menos significativa. La extrapolación exige cautela.}
+
+\textbf{Seguridad de memoria (RNF-002, RNF-003).} El requisito de
+integridad de datos y la imposibilidad de modificar registros de auditoría
+resultan más fáciles de garantizar en \rust\, toda vez que el sistema
+de \textit{ownership} impide la modificación de datos compartidos sin
+paso explícito por \texttt{Mutex} o \texttt{RwLock}. En \java\, la
+mutabilidad implícita de los objetos exige disciplina adicional: el
+uso de colecciones inmutables (\texttt{Collections.unmodifiableList})
+y de objetos de valor (\textit{value objects}) para las entidades
+que no deben modificarse una vez creadas \autocite{Bloch2018}.
+
+\textbf{Concurrencia (RNF-001, RNF-007).} El requisito de responder a
+5.000 usuarios concurrentes en menos de 2 segundos plantea retos de
+concurrencia que ambos lenguajes abordan de manera disímil. En \java\,
+el \textit{framework} \texttt{java.util.concurrent} proporciona
+mecanismos maduros y documentados; en \rust\, la garantía de ausencia
+de condiciones de carrera (\textit{fearless concurrency}) reduce
+el riesgo de errores difíciles de detectar \autocite{Klabnik2023}.
+
+\textbf{Mantenibilidad (RNF-006).} El requisito de cobertura superior
+al 80\% y cumplimiento de principios SOLID es independiente del lenguaje,
+pero el ecosistema de herramientas de análisis estático es más maduro
+en \java\ ---SonarQube, SpotBugs, PMD--- que en \rust\ ---Clippy, Miri---,
+lo que podría facilitar el cumplimiento del -RNF- durante el desarrollo.
+
+%% ─────────────────────────────────────────────
+%% SPRINT 2
+%% ─────────────────────────────────────────────
+\section*{Sprint 2: Levantamiento de requisitos}
+\label{sprint:2}
+\addcontentsline{toc}{section}{Sprint 2: Levantamiento de requisitos}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 2 — Levantamiento de requisitos}]
+  \textbf{Duración estimada:} 1 semana\\
+  \textbf{Objetivo:} Especificar los requisitos funcionales y no funcionales
+  del sistema a partir del análisis del \acuerdo\ y del Estatuto Académico,
+  y formular las historias de usuario del \textit{product backlog} inicial.\\
+  \textbf{Entregables:} (1) Documento RF (mínimo 20) con referencia normativa;
+  (2) Documento RNF (mínimo 6); (3) \textit{Product backlog} con 8 historias
+  priorizadas.
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Tabla del Sprint 2}
+
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4.5cm}}
+  \sprintcabecera
+  \endhead
+  \bottomrule
+  \caption{Entregables, características del programa y criterios de la
+    rúbrica del Sprint 2.}
+  \label{tab:sprint2}
+  \endlastfoot
+  Documento de requisitos funcionales (mínimo 20 RF, agrupados por
+  subsistema, con referencia al artículo del estatuto, prioridad
+  MoSCoW y subsistema)
+  & Aplicar técnicas de levantamiento de requisitos a un dominio
+    normativo real; distinguir actores, procesos y datos del dominio
+  & El estudiante especifica al menos 20 RF coherentes con el estatuto,
+    correctamente agrupados, con prioridad justificada y referencia
+    normativa explícita a los artículos del \acuerdo\ o del Estatuto
+    Académico \\
+  \midrule
+  Documento de requisitos no funcionales (mínimo 6 RNF, con categoría,
+  descripción y métrica de verificación)
+  & Identificar restricciones de calidad del sistema derivadas del
+    dominio normativo e institucional
+  & Los RNF son verificables (tienen métricas concretas), coherentes con
+    el dominio institucional y relevantes para las decisiones de
+    implementación en \java\ y \rust \\
+  \midrule
+  \textit{Product backlog} inicial (mínimo 8 historias de usuario
+  priorizadas con MoSCoW, con criterios de aceptación para las
+  3 de mayor prioridad)
+  & Formular historias de usuario centradas en los actores del dominio
+    institucional; articular requisitos funcionales con necesidades
+    reales de los usuarios
+  & Las historias identifican correctamente el actor, la funcionalidad
+    y el valor; los criterios de aceptación son verificables y coherentes
+    con el dominio institucional \\
+  \midrule
+  Matriz de trazabilidad RF $\leftrightarrow$ artículo del estatuto
+  (tabla con al menos 20 filas)
+  & Evidenciar la trazabilidad entre requisitos y marco normativo;
+    aplicar el principio de trazabilidad normativa (RNF-008)
+  & Cada RF está vinculado a al menos un artículo del \acuerdo\ o del
+    Estatuto Académico; la matriz es verificable mediante consulta
+    directa al texto del estatuto \\
+\end{longtable}
+
+\subsection*{Actividad de reflexión: software generativo y levantamiento de requisitos}
+\label{act:ia-sprint2}
+
+\begin{tcolorbox}[actividadIA,
+  title={Actividad de reflexión (Sprint~2) —
+         Software generativo y levantamiento de requisitos}]
+
+\textbf{Instrucción general.}
+El estudiante elabora un documento de requisitos funcionales a partir
+de la lectura directa del \acuerdo\ y del Estatuto Académico, sin
+asistencia computacional. A continuación, solicita a un asistente
+generativo que derive los mismos requisitos a partir de los mismos
+documentos (proporcionados como contexto). Se comparan ambas propuestas
+aplicando el marco de análisis crítico de la Sección~\ref{sec:ia-reflexion-intro}.
+
+\bigskip
+\textbf{Preguntas orientadoras:}
+\begin{enumerate}[label=\arabic*.]
+  \item ¿El asistente omite requisitos que usted identificó? ¿A qué
+        artículos del estatuto corresponden?
+  \item ¿El asistente genera requisitos que no tienen respaldo en el
+        estatuto (categorizables como ``ruido'' o ``inventados'')? ¿Cómo
+        los detectó?
+  \item ¿En qué medida el asistente distingue entre requisitos funcionales
+        y no funcionales? ¿La distinción es coherente con la que se
+        establece en la sección~\ref{sec:req-no-funcionales}?
+  \item ¿El asistente genera RF relacionados con subsistemas que usted
+        no había considerado? ¿Son pertinentes?
+\end{enumerate}
+
+\bigskip
+\textbf{Producto esperado:} Informe de análisis comparativo (máximo
+4 páginas) con tabla de requisitos propios/asistente, diferencias
+detectadas y conclusiones argumentadas.
+
+\bigskip
+\textbf{Rúbrica breve:}
+\begin{itemize}
+  \item \textbf{Producto} (60\%): completitud ($\geq$ 20 RF propios),
+        coherencia normativa, corrección de la especificación, métricas
+        verificables en los RNF.
+  \item \textbf{Proceso} (40\%): calidad del análisis crítico,
+        profundidad de la comparación, identificación de errores del
+        asistente con argumentación normativa específica.
+\end{itemize}
+
+\end{tcolorbox}
+
+%% ─────────────────────────────────────────────
+%% SPRINT 3
+%% ─────────────────────────────────────────────
+\section*{Sprint 3: Validación de requisitos con \textit{stakeholders}}
+\label{sprint:3}
+\addcontentsline{toc}{section}{Sprint 3: Validación de requisitos con
+  \textit{stakeholders}}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 3 — Validación de requisitos con
+  \textit{stakeholders}}]
+  \textbf{Duración estimada:} 1 semana\\
+  \textbf{Objetivo:} Validar los requisitos especificados en el Sprint~2
+  mediante técnicas de revisión por pares y entrevistas simuladas con
+  actores del dominio institucional; refinar el \textit{product backlog}.\\
+  \textbf{Entregables:} (1) Acta de entrevista de validación; (2)
+  \textit{Backlog} refinado con criterios de aceptación para las 5
+  historias de mayor prioridad; (3) Informe de reflexión crítica.
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Tabla del Sprint 3}
+
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4.5cm}}
+  \sprintcabecera
+  \endhead
+  \bottomrule
+  \caption{Entregables, características del programa y criterios de la
+    rúbrica del Sprint 3.}
+  \label{tab:sprint3}
+  \endlastfoot
+  Acta de entrevista de validación con al menos un actor del dominio
+  (docente, director de programa o personal administrativo de la \ud;
+  o simulado mediante \textit{roleplay} documentado)
+  & Aplicar técnicas de validación de requisitos con actores reales
+    o simulados del dominio institucional; identificar ambigüedades,
+    omisiones y contradicciones en la especificación
+  & El acta registra con fidelidad los aportes del actor entrevistado,
+    los contrasta con los requisitos especificados e identifica al
+    menos 3 ajustes necesarios con justificación \\
+  \midrule
+  \textit{Product backlog} refinado con criterios de aceptación
+  para las 5 historias de mayor prioridad (mínimo 3 criterios
+  por historia, formulados en formato Given-When-Then)
+  & Formular criterios de aceptación verificables y precisos para
+    las historias de usuario prioritarias; aplicar el formato
+    Given-When-Then
+  & Los criterios de aceptación son observables, medibles, coherentes
+    con el dominio institucional y expresados en formato
+    Given-When-Then \\
+  \midrule
+  Informe de análisis crítico de los criterios de aceptación
+  generados por asistente computacional frente a los criterios
+  propios (ver actividad de reflexión)
+  & Desarrollar pensamiento crítico frente a los criterios generados
+    automáticamente; identificar limitaciones del asistente en el
+    tratamiento de dominios normativos institucionales específicos
+  & El informe identifica al menos 3 diferencias sustanciales entre
+    los criterios propios y los del asistente, con argumentación
+    basada en el dominio institucional y en los artículos del \acuerdo \\
+  \midrule
+  Diagrama de contexto refinado (actualización del diagrama inicial
+  del Sprint~1 con base en los hallazgos de la validación)
+  & Incorporar retroalimentación de la validación al modelo de contexto;
+    refinar los flujos de información con actores reales
+  & El diagrama actualizado refleja fielmente los hallazgos de la
+    validación; los cambios respecto de la versión inicial están
+    justificados en el acta \\
+\end{longtable}
+
+\subsection*{Actividad de reflexión: software generativo y validación de requisitos}
+\label{act:ia-sprint3}
+
+\begin{tcolorbox}[actividadIA,
+  title={Actividad de reflexión (Sprint~3) —
+         Software generativo y validación de requisitos}]
+
+\textbf{Instrucción general.}
+El estudiante utiliza un asistente computacional generativo para generar
+criterios de aceptación para las 5 historias de usuario de mayor prioridad
+del \textit{backlog} refinado. Se evalúa la pertinencia y la especificidad
+institucional de los criterios generados en contraste con los criterios
+propios derivados del proceso de validación con actores reales o simulados.
+
+\bigskip
+\textbf{Preguntas orientadoras:}
+\begin{enumerate}[label=\arabic*.]
+  \item ¿Los criterios de aceptación generados por el asistente son
+        verificables en el contexto real de la \ud? Proporcione al menos
+        dos ejemplos concretos de criterios que requieran ajuste.
+  \item ¿El asistente produce criterios genéricos que podrían aplicarse
+        a cualquier institución universitaria sin modificación? ¿Cómo
+        se evidencia la falta de especificidad institucional?
+  \item ¿Qué fragmentos del \acuerdo\ o del Estatuto Académico fueron
+        necesarios proporcionar al asistente para obtener criterios más
+        pertinentes? ¿La calidad mejoró con el contexto adicional?
+  \item Si el asistente generó criterios de aceptación que usted no había
+        considerado y que resultan válidos, ¿cómo integraría este hallazgo
+        en su reflexión sobre el uso responsable del software generativo?
+\end{enumerate}
+
+\bigskip
+\textbf{Rúbrica breve:}
+\begin{itemize}
+  \item \textbf{Producto} (60\%): pertinencia institucional de los
+        criterios de aceptación propios, verificabilidad, uso correcto
+        del formato Given-When-Then, completitud de la cobertura de las
+        5 historias prioritarias.
+  \item \textbf{Proceso} (40\%): calidad del análisis crítico,
+        identificación argumentada de limitaciones del asistente,
+        evidencia de iteración entre criterios propios y retroalimentación
+        del asistente.
+\end{itemize}
+
+\end{tcolorbox}

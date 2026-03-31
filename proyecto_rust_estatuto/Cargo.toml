@@ -1,0 +1,19 @@
+[package]
+name = "estatuto-ud"
+version = "0.1.0"
+edition = "2021"
+authors = ["Roberto Albeiro Pava-Díaz <rpavad@udistrital.edu.co>"]
+description = "Sistema de información académico-administrativo — Universidad Distrital Francisco José de Caldas"
+
+# Conforme al Acuerdo 004 de 2025 — Estatuto General de la Universidad Distrital
+
+[dependencies]
+eframe = "0.31"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+# Las pruebas se implementan con el macro #[test] nativo de Rust

@@ -1,0 +1,1506 @@
+%% ============================================================
+%% cap07.tex — Capítulo 7
+%% Software generativo, ética y aprendizaje de la programación
+%% Autor: Roberto Albeiro Pava-Díaz, Ph.D.
+%% Universidad Distrital Francisco José de Caldas
+%% Versión Phase 2 — Marzo 2026
+%% ============================================================
+
+\chapter{Software generativo, ética y aprendizaje de la programación}
+\label{cap:ia-etica}
+
+
+\noindent
+Once \textit{sprints} después del primero, el estudiante llega a este
+capítulo con código escrito, diagramas producidos, pruebas ejecutadas
+y, muy probablemente, decenas de interacciones con asistentes
+computacionales generativos a lo largo del proceso. La pregunta que
+se planteó en la advertencia del prefacio ---si el empleo de software
+generativo fortalece o menoscaba el aprendizaje genuino de la
+\poo--- ya no es abstracta: hay evidencia propia con la que responderla.
+Queda, sin embargo, la duda de si esa evidencia es suficiente para
+generalizar, y el autor reconoce que no existe, al momento de redactar
+este texto (marzo de 2026), un cuerpo empírico robusto que resuelva
+la pregunta para el contexto específico de los estudiantes de pregrado
+de ingeniería en universidades públicas colombianas.\footnote{%
+  La revisión de la literatura realizada en enero de 2026 en las bases
+  de datos Scopus, IEEE Xplore y ACM Digital Library arrojó escasos
+  estudios controlados sobre el impacto del software generativo en el
+  aprendizaje de la POO en contextos latinoamericanos. La mayoría de los
+  trabajos disponibles provienen de universidades norteamericanas o europeas,
+  con estudiantes cuyas condiciones de acceso tecnológico difieren
+  sustancialmente de las prevalentes en la \ud. La extrapolación exige cautela.}
+
+Tres preguntas organizan la arquitectura de este capítulo final.
+Primera: ¿qué son, técnicamente, estos asistentes computacionales
+generativos y qué pueden o no pueden hacer en el dominio de la
+programación orientada a objetos? Segunda: ¿qué disposiciones pedagógicas
+y éticas se derivan del hecho de que el estudiante tenga acceso a ellos?
+Tercera: ¿cómo puede el formador evaluar el razonamiento de diseño
+orientado a objetos en un entorno donde el código puede originarse en
+cualquier fuente? Ninguna de estas preguntas admite respuesta definitiva.
+Pero todas admiten un análisis más riguroso del que suele encontrarse en
+el discurso ordinario sobre IA y educación.
+
+%% ─────────────────────────────────────────────
+\section{Modelos generativos en el contexto educativo}
+\label{sec:modelos-generativos}
+%% ─────────────────────────────────────────────
+
+\noindent
+Dos mil veintitrés fue el año en que los asistentes computacionales
+generativos dejaron de ser una curiosidad académica para convertirse
+en presencia cotidiana en los laboratorios de programación. Dos mil
+veintiséis es el año en que este texto se escribe, y la penetración
+de estos sistemas en los entornos de aprendizaje universitario ---no
+solo en Colombia, sino en América Latina y el mundo--- se ha
+profundizado de manera que pocos anticiparon con precisión.\footnote{%
+  El autor observó, durante el primer semestre de 2025 en la
+  Facultad de Ingeniería de la \ud, que más del 70\,\% de los
+  estudiantes de Programación Orientada a Objetos declararon
+  voluntariamente haber empleado algún asistente computacional
+  generativo en la elaboración de al menos un entregable del semestre.
+  La cifra proviene de una encuesta anónima aplicada al cierre del
+  semestre y no ha sido sometida a validación estadística rigurosa;
+  se reporta como indicador orientador, no como medida definitiva.}
+Conviene, antes de examinar las implicaciones pedagógicas y éticas,
+caracterizar con precisión qué son estos sistemas y cómo operan.
+
+\subsection{Arquitectura conceptual: transformadores y predicción de siguiente \textit{token}}
+\label{subsec:arquitectura-llm}
+
+Los sistemas que generan texto y código de manera automática ---denominados
+en este libro \emph{asistentes computacionales generativos} o, con mayor
+brevedad, \emph{software generativo}--- se fundamentan en una arquitectura
+neuronal denominada \textit{transformer}, propuesta por Vaswani et al.\ en 2017
+y perfeccionada de manera acelerada durante la década siguiente
+\parencite{Martin2017}. El principio de funcionamiento, descrito a nivel
+conceptual, es la predicción iterativa del siguiente \textit{token} más probable
+dada una secuencia de entrada: el modelo no ``comprende'' el código en ningún
+sentido semántico profundo; estima la continuación estadísticamente más verosímil
+de una cadena de símbolos. Esta distinción ---entre plausibilidad estadística y
+comprensión semántica--- no es menor. Es, de hecho, la fuente de la mayoría de
+los errores que estos sistemas cometen cuando se les solicita código que modela
+dominios específicos con invariantes no triviales.
+
+El ajuste por retroalimentación humana ({\small RLHF}, por sus siglas en inglés
+\textit{Reinforcement Learning from Human Feedback}) permite orientar el
+comportamiento del modelo hacia respuestas evaluadas como útiles por revisores
+humanos \parencite{Fowler2018}. El resultado es un sistema que produce texto y código de alta fluidez
+superficial pero con garantías semánticas limitadas. Queda por determinar si
+el RLHF introduce o reduce sesgos específicos en el dominio de la POO; los
+indicios disponibles al momento de redactar este texto sugieren que los sesgos
+existen pero no han sido caracterizados con precisión para dominios institucionales
+del tipo del estatuto de la \ud.
+
+Cinco propiedades de estos modelos resultan directamente relevantes para el
+diseño de estrategias pedagógicas:
+
+\begin{enumerate}[label=\arabic*.]
+  \item \textbf{Alta fluidez superficial}: el código generado compila con
+        frecuencia y luce correcto a primera vista, lo que dificulta
+        la detección de errores semánticos.
+  \item \textbf{Dependencia del corpus de entrenamiento}: la calidad del
+        código generado para un lenguaje o dominio específico depende
+        del volumen y la calidad del código de ese lenguaje en el corpus
+        de entrenamiento.
+  \item \textbf{Incapacidad para razonar sobre invariantes no documentadas}:
+        si una restricción del dominio no está explícitamente en el
+        \textit{prompt}, el modelo la ignorará.
+  \item \textbf{Alucinación}: el modelo puede generar código que invoca
+        métodos o clases inexistentes en la API objetivo, con
+        confianza aparente.
+  \item \textbf{Genericidad de los patrones}: el modelo tiende a producir
+        soluciones genéricas que pueden violar los principios SOLID
+        cuando el dominio exige especialización.
+\end{enumerate}
+
+\subsection{Taxonomía de asistentes computacionales generativos para programación}
+\label{subsec:taxonomia-asistentes}
+
+La Tabla~\ref{tab:asistentes-generativos} clasifica los principales asistentes
+computacionales generativos disponibles al primer trimestre de 2026, diferenciando
+entre los de propósito general y los especializados en código. La clasificación es
+necesariamente provisional: el ritmo de evolución de estos sistemas hace que
+cualquier fotografía del ecosistema tenga vigencia constreñida.
+
+\begingroup
+\small
+\begin{longtable}{L{2.5cm} L{2cm} L{4.5cm} L{4.5cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Taxonomía de asistentes computacionales generativos relevantes para el aprendizaje de la POO. Elaboración del autor (primer trimestre de 2026).} \label{tab:asistentes-generativos} \\
+	\toprule
+	\textbf{Asistente} & \textbf{Tipo} & \textbf{Capacidades destacadas} & \textbf{Limitaciones documentadas} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Asistente} & \textbf{Tipo} & \textbf{Capacidades destacadas} & \textbf{Limitaciones documentadas} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	GitHub Copilot
+	& Especializado en código
+	& Autocompletado en contexto del IDE; sugerencias de métodos completos; integración con repositorios propios del usuario
+	& Dependencia del contexto visible en el editor; errores en código que modela dominios complejos con múltiples invariantes; código \java\ frecuentemente genérico \\
+	\midrule
+	
+	Claude (Anthropic)
+	& Propósito general (código fuerte)
+	& Razonamiento sobre requisitos complejos; explicación detallada de decisiones de diseño; análisis crítico del código aportado
+	& Alucinación de API en versiones de JDK recientes; restricciones en ventana de contexto para proyectos grandes \\
+	\midrule
+	
+	ChatGPT (OpenAI)
+	& Propósito general
+	& Generación de código en múltiples lenguajes; explicación de mensajes de error; generación de pruebas unitarias
+	& Patrones de diseño genéricos; dificultad con dominios institucionales específicos no documentados en el corpus \\
+	\midrule
+	
+	Gemini (Google)
+	& Propósito general / Multimodal
+	& Integración con Google Workspace; razonamiento multimodal; explicación de diagramas UML en imagen
+	& Menor especialización en código \java\ empresarial comparado con Copilot; variabilidad en sintaxis de \rust \\
+	\midrule
+	
+	Cursor / Aider
+	& Especializados en IDE
+	& Edición de archivos completos en contexto; refactorización guiada; \textit{diff} aplicado directamente al código base
+	& Requieren configuración avanzada; curva de aprendizaje para estudiantes sin experiencia previa en CLI \\
+	\midrule
+	
+	Codeium / Tabnine
+	& Especializados (opciones locales)
+	& Autocompletado gratuito; menor latencia; pueden ejecutarse con modelos locales en entornos con baja conectividad
+	& Capacidad de razonamiento menor que modelos de mayor escala; ventana de contexto limitada \\
+\end{longtable}
+\endgroup
+
+\subsection{Penetración en los entornos universitarios colombianos y latinoamericanos}
+\label{subsec:penetracion-col}
+
+La difusión del software generativo en los programas de ingeniería de sistemas
+de Colombia presenta una asimetría que el autor denomina ---quizás de manera
+provisional--- \emph{brecha generativa}: la diferencia entre las condiciones
+de acceso a estos sistemas entre instituciones privadas de alta matrícula y las
+universidades públicas. La \ud, con sede en la Macarena (carrera 8 con calle 40)
+y salas de sistemas compartidas cuyo ancho de banda es insuficiente en horas
+pico, no puede asumir que todos sus estudiantes acceden a versiones premium de
+estos asistentes desde dispositivos propios con conexión estable. Esa
+constatación ---que no es un detalle menor, sino una condición estructural del
+aprendizaje--- atraviesa toda la discusión ética de la sección~\ref{sec:marco-etico}.
+
+Sin embargo, la penetración existe. Cabría pensar que la ausencia de acceso
+premium implica ausencia de uso; la experiencia del autor en el primer semestre
+de 2025 contradice esa hipótesis. Los estudiantes emplean versiones gratuitas,
+acuden a compañeros con acceso de pago, utilizan los quince minutos diarios
+de uso gratuito con múltiples cuentas. La creatividad para sortear las barreras
+de acceso es, en sí misma, un dato pedagógicamente relevante: el estudiante
+distrital no espera que la herramienta llegue a él; la busca. No es descartable
+que esa búsqueda activa contribuya a un uso más reflexivo que el de quien tiene
+acceso ilimitado sin esfuerzo previo.
+
+A nivel latinoamericano, el panorama presenta similitudes. Los estudios
+preliminares disponibles ---entre ellos, encuestas de adopción en universidades
+brasileñas, mexicanas y argentinas publicadas entre 2024 y 2025--- indican
+tasas de adopción declarada superiores al 60\,\% entre estudiantes de ingeniería
+de sistemas, con variaciones significativas según el nivel del curso y la
+actitud del docente \parencite{Bloch2018}. La mayoría de las instituciones
+latinoamericanas carece, al momento de redactar este texto, de políticas
+explícitas sobre el uso de software generativo en evaluaciones de programación.
+
+%% ─────────────────────────────────────────────
+\section{Oportunidades y riesgos del uso de asistentes computacionales en \poo}
+\label{sec:oportunidades-riesgos}
+%% ─────────────────────────────────────────────
+
+\noindent
+El análisis equilibrado del software generativo en el contexto del aprendizaje
+de la orientación a objetos exige resistir dos tentaciones simétricas: la del
+entusiasmo acrítico, que ve en estos sistemas una revolución pedagógica sin
+precedentes, y la del rechazo apriorístico, que los descarta como amenaza para
+la formación genuina. Ninguna de las dos posiciones resiste el escrutinio de
+la evidencia disponible. Lo que se propone aquí es un examen caso a caso,
+anclado en el dominio específico del sistema de información estatutario
+que atraviesa el libro.
+
+\subsection{Oportunidades: andamiaje, explicación y comparación}
+\label{subsec:oportunidades}
+
+Cuatro oportunidades concretas se identifican, cada una con su ámbito de validez
+y sus condiciones de uso:
+
+\textbf{Primera: generación de código de andamiaje} (\textit{boilerplate}).
+En los Sprints 1 a 3 (capítulos~\ref{cap:fundamentos} y~\ref{cap:modelado}),
+el estudiante dedica tiempo considerable a escribir constructores, métodos
+\textit{getters} y \textit{setters}, y métodos \texttt{toString} y \texttt{equals}
+en \java, o las implementaciones de \textit{traits} \texttt{Display} y \texttt{Debug}
+en \rust. El software generativo puede producir este código estructural de
+manera confiable ---puesto que se trata de patrones altamente repetidos en el
+corpus de entrenamiento--- liberando tiempo cognitivo del estudiante para las
+decisiones de diseño que sí requieren comprensión del dominio. Esta es, quizás,
+la oportunidad de uso más legítima y menos arriesgada.
+
+\textbf{Segunda: explicación de mensajes de error del compilador.}
+Los mensajes del compilador de \rust, en particular, son notoriamente
+detallados pero inicialmente opacos para el estudiante novel. Preguntar
+al asistente computacional «¿qué significa este error de \textit{lifetime}?»
+y obtener una explicación contextualizada produce un valor pedagógico genuino
+---siempre que el estudiante entienda la explicación antes de aplicarla, y no
+simplemente copie la corrección sugerida sin comprenderla. La diferencia entre
+estos dos modos de uso es cardinal y, con frecuencia, invisible desde afuera.
+
+\textbf{Tercera: generación de variantes para comparación crítica.}
+Una práctica que el autor ha experimentado con resultados prometedores consiste
+en solicitar al asistente generativo dos o tres implementaciones alternativas
+de un mismo método ---por ejemplo, tres formas distintas de representar la jerarquía
+de unidades académicas del Estatuto--- y pedir al estudiante que compare
+críticamente cuál es más coherente con los principios SOLID y por qué. El
+software generativo pasa así de ser el productor del código a ser el generador
+del problema que el estudiante debe resolver.
+
+\textbf{Cuarta: andamiaje estructural para la reflexión.}
+En la actividad final del Sprint~12 (sección~\ref{act:ia-sprint12}), el asistente
+puede ayudar al estudiante a estructurar su reflexión crítica: sugerir un índice,
+señalar incoherencias argumentativas, proponer preguntas que no se han formulado.
+Pero el contenido ---la evidencia propia, el análisis, la posición ética--- debe
+provenir del estudiante.
+
+\subsection{Riesgos: delegación del diseño, aceptación acrítica y pérdida del proceso de depuración}
+\label{subsec:riesgos}
+
+Los riesgos, análogamente, son concretos y no abstractos:
+
+\textbf{Primero: delegación de las decisiones de diseño orientado a objetos.}
+En el Sprint~4 (capítulo~\ref{cap:java}), el estudiante enfrenta la decisión
+de modelar la relación entre \texttt{Docente} y \texttt{UnidadAcademica}: ¿composición
+o asociación? ¿interfaz o clase abstracta? Si delega esa decisión al asistente
+sin comprenderla, el resultado puede ser código que compila pero que no refleja
+las restricciones del Estatuto \parencite{Martin2017}. El riesgo no es el código malo: es el razonamiento
+ausente, que permanecerá ausente también en los proyectos profesionales subsecuentes.
+
+\textbf{Segundo: aceptación acrítica de código que viola invariantes del dominio.}
+El asistente no conoce el \acuerdo\ a menos que se le proporcione. En ausencia
+de ese contexto, generará código genérico que puede violar restricciones normativas
+específicas. La Sección~\ref{sec:analisis-critico} documenta tres ejemplos
+concretos de este riesgo. No es trivial.
+
+\textbf{Tercero: menoscabo del proceso de depuración como fuente de aprendizaje.}
+Leer el \textit{stack trace}, entender el mensaje de excepción, navegar el código
+para localizar la causa raíz de un fallo: ese proceso es pedagógicamente valioso
+porque obliga al estudiante a construir un modelo mental del flujo de ejecución
+del programa. Si el asistente resuelve el error antes de que el estudiante lo
+haya comprendido, ese aprendizaje no ocurre. La velocidad del asistente es,
+en este contexto, un obstáculo.
+
+La Tabla~\ref{tab:oportunidades-riesgos} sintetiza el análisis con ejemplos
+extraídos del sistema de información estatutario.
+
+\begingroup
+\small
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4cm} C{1.8cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Oportunidades y riesgos del empleo de software generativo en el aprendizaje de la POO (Sistema Estatutario \ud). Elaboración del autor.} \label{tab:oportunidades-riesgos} \\
+	\toprule
+	\textbf{Oportunidad} & \textbf{Ejemplo en el sistema} & \textbf{Riesgo} & \textbf{Sprint} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Oportunidad} & \textbf{Ejemplo en el sistema} & \textbf{Riesgo} & \textbf{Sprint} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Generación de \textit{boilerplate} & 
+	Constructores, getters/setters y \texttt{equals()} de \texttt{Docente}, \texttt{Estudiante} y \texttt{UnidadAcademica} & 
+	Delegación del diseño de herencia y jerarquías sin comprensión real & 
+	2--5 \\
+	\midrule
+	
+	Explicación de errores & 
+	Mensajes de \textit{lifetime} en \rust\ al implementar préstamos entre \texttt{Facultad} y \texttt{Proyecto} & 
+	Corrección mecánica sin comprensión; el error reaparece en otros contextos & 
+	5--7 \\
+	\midrule
+	
+	Generación de variantes & 
+	Implementaciones de \texttt{calcularPromedio()} con enfoques iterativos, \textit{streams} y recursivos & 
+	Selección de la variante más corta por estética, no por corrección semántica & 
+	8 \\
+	\midrule
+	
+	Casos de prueba & 
+	Esqueletos JUnit para las invariantes de \texttt{EvaluacionFormativa} según el Estatuto & 
+	Pruebas triviales que omiten las restricciones normativas reales de la \ud & 
+	9--10 \\
+	\midrule
+	
+	Andamiaje reflexivo & 
+	Estructura sugerida para la reflexión crítica final del Sprint~12 & 
+	Reflexión generada por IA sin evidencia de aprendizaje propio del estudiante & 
+	12 \\
+	\midrule
+	
+	Traducción de patrones & 
+	Equivalente en \rust\ del patrón \textit{Builder} empleado en \java\ para \texttt{EstatutoAcademico} & 
+	Código \rust\ no sintácticamente correcto que el estudiante acepta por falta de experiencia & 
+	6--7 \\
+\end{longtable}
+\endgroup
+
+\subsection{Tres ejemplos de código generado que viola las reglas del dominio}
+\label{subsec:ejemplos-violacion}
+
+Los tres listados que se presentan a continuación documentan situaciones reales
+observadas durante el primer semestre de 2025 en las asignaturas de programación
+de la Facultad de Ingeniería. En cada caso, el asistente computacional generó
+código sintácticamente correcto pero semánticamente incompatible con el dominio
+del \acuerdo.
+
+\textbf{Ejemplo~1: violación de la restricción de vinculación docente.}
+El Artículo~31 del \acuerdo\ establece que un docente de planta sólo puede
+estar vinculado a una Facultad como unidad académica principal. El código
+generado por un asistente, al no conocer esta restricción, produce:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Código generado que viola la restricción de vinculación única del
+    docente (Artículo~31 del Acuerdo 004 de 2025). El error es semántico,
+    no sintáctico: el compilador no lo detecta.},
+  label={lst:violacion-vinculacion}]
+// Código generado por asistente computacional — INCORRECTO
+// Viola la restricción de vinculación única establecida en el estatuto
+public class DocentePlanta extends Docente {
+    // PROBLEMA: permite múltiples Facultades como afiliación principal
+    private List<Facultad> facultadesAfiliadas;
+
+    public void agregarFacultad(Facultad f) {
+        // Sin validación de unicidad — viola Art. 31 del Acuerdo 004/2025
+        this.facultadesAfiliadas.add(f);
+    }
+
+    public List<Facultad> getFacultades() {
+        return facultadesAfiliadas;
+    }
+}
+\end{lstlisting}
+
+\textbf{Ejemplo~2: jerarquía de unidades académicas invertida.}
+El asistente, al recibir un \textit{prompt} que menciona \texttt{Facultad},
+\texttt{Proyecto Curricular} y \texttt{Escuela} sin contexto normativo,
+frecuentemente invierte la jerarquía definida en el Estatuto, haciendo que
+\texttt{Escuela} sea padre de \texttt{Facultad}:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Jerarquía de unidades académicas invertida por el asistente generativo.
+    La relación correcta, según el Acuerdo 004 de 2025, establece que la Facultad
+    contiene Proyectos Curriculares y éstos se articulan con Escuelas, no al revés.},
+  label={lst:jerarquia-invertida}]
+// Código generado — JERARQUÍA INCORRECTA
+// El asistente asume que Escuela > Facultad, lo cual invierte
+// la estructura del Estatuto de la UD
+
+public class Escuela {
+    private List<Facultad> facultades; // INCORRECTO: la Facultad no depende de Escuela
+    private String nombre;
+
+    public Escuela(String nombre) {
+        this.nombre = nombre;
+        this.facultades = new ArrayList<>();
+    }
+
+    public void agregarFacultad(Facultad f) {
+        this.facultades.add(f); // Violación de la jerarquía normativa
+    }
+}
+\end{lstlisting}
+
+\textbf{Ejemplo~3: manejo de \texttt{null} donde el Estatuto exige valor explícito.}
+El sistema de evaluación del \acuerdo\ no admite calificaciones nulas: toda
+evaluación debe registrar un valor numérico o una ausencia justificada (\textit{enum}).
+El asistente, siguiendo patrones genéricos de \java, genera código que permite
+\texttt{null}:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Uso de \texttt{null} donde el dominio estatutario exige un valor
+    explícito. El patrón correcto emplea \texttt{Optional<Double>} o un tipo
+    enumerado que represente la ausencia justificada de calificación.},
+  label={lst:null-violacion}]
+// Código generado — MANEJO DE NULL INCORRECTO PARA EL DOMINIO
+public class EvaluacionFormativa {
+    private String codigoEstudiante;
+    private String codigoAsignatura;
+    private Double calificacion; // PROBLEMA: null no es válido en este dominio
+
+    // El asistente genera un getter simple sin validación
+    public Double getCalificacion() {
+        return calificacion; // Puede devolver null — viola invariante del dominio
+    }
+
+    // Versión correcta exigida por el dominio:
+    // public Optional<Double> getCalificacion() { ... }
+    // o: private EstadoCalificacion estado; (PENDIENTE, REGISTRADA, JUSTIFICADA)
+}
+\end{lstlisting}
+
+Los tres ejemplos ilustran un patrón recurrente: el asistente computacional
+generativo produce código correcto para un dominio genérico imaginario, pero
+incorrecto para el dominio específico del \acuerdo. La distinción no es menor;
+es, de hecho, el núcleo de la discusión sobre el valor pedagógico del diseño
+orientado a objetos frente a la mera producción de código.
+
+%% ─────────────────────────────────────────────
+\section{Estrategias para el análisis crítico del código generado}
+\label{sec:analisis-critico}
+%% ─────────────────────────────────────────────
+
+\noindent
+Dado que el software generativo produce código con fluidez superficial
+pero con errores semánticos frecuentes ---tal como ilustran los listados de la
+sección anterior---, resulta indispensable que el estudiante desarrolle un
+protocolo sistemático de revisión crítica. No se trata de desconfiar de todo
+código generado, sino de someter cada pieza a un escrutinio que el propio
+estudiante debe ser capaz de realizar.
+
+\subsection{Protocolo de revisión crítica del código generado}
+\label{subsec:protocolo-revision}
+
+El protocolo que se propone a continuación se articula en cinco dimensiones
+secuenciales. Seguirlas en orden no es arbitrario: cada dimensión presupone
+la anterior, y saltarse la dimensión semántica para ir directamente a la
+compilabilidad equivale a aceptar que el código hace algo, sin verificar
+que ese algo sea lo correcto.
+
+\begin{enumerate}[label=\textbf{D\arabic*.}, leftmargin=2.5cm]
+
+  \item \textbf{Corrección semántica: ¿el código hace lo que el dominio requiere?}
+
+        Antes de ejecutar el compilador, el estudiante debe leer el código
+        generado y compararlo con el requisito de dominio que motivó la
+        solicitud. Para el sistema estatutario, esto implica contrastar el
+        código con el artículo del \acuerdo\ correspondiente. Las preguntas
+        guía son: ¿se respetan todas las restricciones normativas declaradas?
+        ¿Hay decisiones de diseño que el asistente tomó de manera implícita
+        sin fundamento en el Estatuto? ¿Se modelan correctamente las
+        cardinalidades de las relaciones?
+
+  \item \textbf{Corrección sintáctica y compilabilidad.}
+
+        Sólo después de verificar la corrección semántica se procede a
+        compilar. Si el código tiene errores de compilación, se entienden
+        los mensajes del compilador antes de aplicar la corrección sugerida
+        por el asistente. Cada error de compilación es, potencialmente, un
+        evento de aprendizaje; suprimirlo sin comprenderlo es un costo
+        pedagógico.
+
+  \item \textbf{Conformidad con los principios SOLID.}
+
+        El código generado se evalúa contra los cinco principios documentados
+        en la sección~\ref{sec:solid} del capítulo~\ref{cap:fundamentos}:
+        responsabilidad única, abierto/cerrado, sustitución de Liskov,
+        segregación de interfaces y dependencia de abstracciones. Con
+        frecuencia, el asistente viola el principio de responsabilidad única
+        al agrupar en una sola clase responsabilidades que el diseño orientado
+        a objetos exige separar.
+
+  \item \textbf{Calidad de la documentación.}
+
+        Los comentarios y la documentación generados por el asistente son
+        frecuentemente genéricos. Un comentario que diga \texttt{// Returns
+        the teacher's name} no añade información sobre el significado del
+        nombre en el contexto del Estatuto. La revisión de la documentación
+        debe verificar que los comentarios Javadoc (o los comentarios de
+        documentación en \rust) sean precisos, específicos del dominio y
+        referencien, cuando corresponda, el artículo normativo aplicable.
+
+  \item \textbf{Prueba sistemática de las invariantes del dominio.}
+
+        Cada invariante del dominio identificado en la revisión de la
+        dimensión D1 debe tener al menos una prueba unitaria que lo verifique.
+        No basta con que el código compile y ejecute sin error: debe demostrarse
+        que las restricciones normativas se cumplen ante casos de borde
+        deliberadamente diseñados para violentarlas.
+
+\end{enumerate}
+
+\subsection{Diagrama del protocolo de revisión}
+\label{subsec:diagrama-protocolo}
+
+El flujo del protocolo, descrito textualmente para su representación futura
+como figura, puede resumirse como sigue. El punto de entrada es la recepción
+del código generado. La primera verificación es semántica: si el código no
+satisface los requisitos del dominio, se reformula el \textit{prompt} y se
+reinicia el proceso. Si satisface los requisitos, se verifica la compilabilidad.
+Si no compila, se analizan los errores antes de corrección. Si compila, se
+evalúa contra SOLID. Si viola SOLID, se refactoriza. Si es conforme, se
+revisa la documentación y se genera la suite de pruebas. Si las pruebas pasan,
+el código es candidato a integración. Si alguna prueba falla, se regresa a D1.
+El proceso es iterativo, no lineal.
+
+\subsection{Ejemplo completo: clase \texttt{Docente} con errores ocultos y versión corregida}
+\label{subsec:ejemplo-docente}
+
+El listado~\ref{lst:docente-generado-erroneo} muestra el código generado
+por un asistente computacional para la clase \texttt{Docente} ante el
+\textit{prompt} siguiente: «\textit{Genera la clase Docente en Java para
+un sistema de información universitario, con tipos de vinculación (planta,
+cátedra, ocasional) y métodos para gestionar su asignación académica.}»
+El código es sintácticamente correcto y, en apariencia, razonable. Pero
+contiene al menos cuatro errores semánticos respecto del dominio del \acuerdo.
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Clase \texttt{Docente} generada por asistente computacional.
+    El código compila sin errores pero contiene cuatro violaciones del dominio
+    estatutario, identificadas con comentarios \texttt{// ERROR-n:}.},
+  label={lst:docente-generado-erroneo}]
+// Generado por asistente computacional — CONTIENE ERRORES DE DOMINIO
+public class Docente {
+    private String nombre;
+    private String cedula;
+    private String tipoVinculacion; // ERROR-1: debería ser enum TipoDocente
+    private List<String> asignaturas; // ERROR-2: String no es el tipo del dominio
+    private double salario; // ERROR-3: salario no es atributo del dominio estadístico
+    private Facultad facultad; // ERROR-4: cardinalidad incorrecta para cátedra
+
+    public Docente(String nombre, String cedula, String tipoVinculacion) {
+        this.nombre = nombre;
+        this.cedula = cedula;
+        this.tipoVinculacion = tipoVinculacion; // Sin validación del tipo
+        this.asignaturas = new ArrayList<>();
+    }
+
+    public void asignarAsignatura(String codigoAsignatura) {
+        // Sin verificar límite de créditos según tipo de vinculación
+        this.asignaturas.add(codigoAsignatura);
+    }
+
+    public String getTipoVinculacion() {
+        return tipoVinculacion;
+    }
+
+    // Getters y setters genéricos — omitidos por brevedad
+}
+\end{lstlisting}
+
+El listado~\ref{lst:docente-corregido} presenta la versión corregida, producida
+después de aplicar el protocolo de revisión completo. Los cuatro errores han
+sido subsanados y el código es ahora coherente con el dominio del \acuerdo.
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Clase \texttt{Docente} corregida mediante aplicación del protocolo
+    de revisión crítica. Se emplean tipos propios del dominio, validaciones
+    normativas y documentación precisa referenciando el Acuerdo 004 de 2025.},
+  label={lst:docente-corregido}]
+/**
+ * Representa un docente vinculado a la Universidad Distrital Francisco José de Caldas.
+ * La vinculación docente se clasifica según el Artículo 31 del Acuerdo 004 de 2025.
+ *
+ * @author Roberto Albeiro Pava-Díaz
+ * @version 1.0
+ */
+public class Docente {
+    private final String nombre;
+    private final String identificacion;
+    /** Tipo de vinculación: PLANTA, CATEDRA u OCASIONAL (Art. 31 Acuerdo 004/2025). */
+    private final TipoDocente tipoVinculacion;
+    /** Una Facultad principal para docentes de planta; puede ser null para cátedra. */
+    private UnidadAcademica unidadPrincipal;
+    /** Proyectos curriculares a los que está asignado este semestre. */
+    private final List<ProyectoCurricular> proyectosAsignados;
+
+    public Docente(String nombre, String identificacion, TipoDocente tipo) {
+        Objects.requireNonNull(nombre, "El nombre del docente no puede ser nulo");
+        Objects.requireNonNull(identificacion, "La identificación es obligatoria");
+        Objects.requireNonNull(tipo, "El tipo de vinculación es obligatorio");
+        this.nombre = nombre;
+        this.identificacion = identificacion;
+        this.tipoVinculacion = tipo;
+        this.proyectosAsignados = new ArrayList<>();
+    }
+
+    /**
+     * Asigna el docente a un proyecto curricular, validando la restricción
+     * de carga académica máxima según el tipo de vinculación (Art. 35 Ac. 004/2025).
+     *
+     * @param proyecto el proyecto curricular a asignar
+     * @throws IllegalStateException si se supera la carga académica permitida
+     */
+    public void asignarProyecto(ProyectoCurricular proyecto) {
+        Objects.requireNonNull(proyecto, "El proyecto no puede ser nulo");
+        int cargaActual = proyectosAsignados.stream()
+            .mapToInt(ProyectoCurricular::getCreditosSemestrales)
+            .sum();
+        int limiteCreditos = tipoVinculacion.getLimiteCreditos();
+        if (cargaActual + proyecto.getCreditosSemestrales() > limiteCreditos) {
+            throw new IllegalStateException(
+                String.format("Docente %s excede límite de %d créditos (%s)",
+                    nombre, limiteCreditos, tipoVinculacion));
+        }
+        this.proyectosAsignados.add(proyecto);
+    }
+
+    public TipoDocente getTipoVinculacion() { return tipoVinculacion; }
+    public String getNombre()               { return nombre; }
+    public String getIdentificacion()       { return identificacion; }
+
+    /** Devuelve la unidad académica principal; puede ser vacío para docentes de cátedra. */
+    public Optional<UnidadAcademica> getUnidadPrincipal() {
+        return Optional.ofNullable(unidadPrincipal);
+    }
+}
+\end{lstlisting}
+
+La diferencia entre los dos listados no es estilística: es de corrección semántica.
+El primero compila; el segundo es correcto respecto del dominio. Esa diferencia ---entre
+lo que compila y lo que es correcto--- constituye el núcleo del aprendizaje en diseño
+orientado a objetos, y es, precisamente, la dimensión que el software generativo no
+puede sustituir.
+
+%% ─────────────────────────────────────────────
+\section{Evaluación de la originalidad y del razonamiento en diseño orientado a objetos}
+\label{sec:evaluacion-originalidad}
+%% ─────────────────────────────────────────────
+
+\noindent
+La irrupción de los asistentes computacionales generativos en los entornos de
+aprendizaje de programación suscita una pregunta que no es nueva pero adquiere
+urgencia renovada: ¿qué se evalúa cuando se evalúa un programa? Si la pregunta
+era discutible antes de 2023, hoy es inescapable. Un estudiante puede producir,
+en minutos, código funcionalmente correcto para cualquier enunciado típico de
+un examen de programación orientada a objetos. El código puede no ser
+sintácticamente correcto, puede contener errores de dominio, puede violar SOLID ---pero, en
+la mayoría de los exámenes tradicionales, esas deficiencias no se detectan.
+
+\subsection{El reto de la evaluación auténtica}
+\label{subsec:evaluacion-autentica}
+
+La evaluación auténtica en POO ---la que mide lo que realmente importa---
+no consiste en verificar que el código compila. Consiste en verificar que el
+estudiante comprende por qué el código tiene la estructura que tiene, qué
+alternativas de diseño se consideraron y descartaron, y bajo qué criterios
+normativos o técnicos se tomó cada decisión. Esa comprensión no puede generarse
+automáticamente: debe construirla el estudiante.
+
+El marco de evaluación centrado en el razonamiento de diseño, que se propone
+en la Tabla~\ref{tab:evaluacion-comp}, desplaza el foco del producto (el código)
+hacia el proceso (las decisiones documentadas). Las fuentes de evidencia son
+los artefactos producidos a lo largo de los doce \textit{sprints}: tarjetas de
+decisión, diagramas UML comentados, reflexiones de sprint y la actividad final
+del Sprint~12.
+
+\begingroup
+\small
+\begin{longtable}{@{} L{2.8cm} L{3.8cm} L{4.2cm} L{2.8cm} @{} }
+	% --- Título y encabezado de la primera página ---
+	\caption{Comparación entre el modelo de evaluación tradicional y el modelo centrado en el razonamiento de diseño. Fuente: Elaboración del autor.} \label{tab:evaluacion-comp} \\
+	\toprule
+	\textbf{Aspecto} & \textbf{Evaluación tradicional} & \textbf{Evaluación centrada en razonamiento} & \textbf{Vulnerabilidad al software gen.} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Aspecto} & \textbf{Evaluación tradicional} & \textbf{Evaluación centrada en razonamiento} & \textbf{Vulnerabilidad al software gen.} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Qué se entrega & 
+	Código fuente o examen en papel / plataforma. & 
+	Código + tarjeta de decisión + diagrama UML anotado + reflexión crítica. & 
+	\textbf{Alta} (solo código) / \textbf{Baja} (conjunto completo). \\
+	\midrule
+	
+	Qué se mide & 
+	Corrección sintáctica y funcionalidad básica del programa. & 
+	Coherencia entre decisiones de diseño, norma estatutaria de la \ud\ y código. & 
+	\textbf{Alta} / \textbf{Muy baja}. \\
+	\midrule
+	
+	Escala temporal & 
+	Evento puntual y asincrónico (examen único). & 
+	Proceso longitudinal y progresivo (12 sprints). & 
+	\textbf{Alta} / \textbf{Baja}. \\
+	\midrule
+	
+	Rol del docente & 
+	Calificador del producto final (corrector de errores). & 
+	Evaluador del proceso, de la lógica y de la argumentación técnica. & 
+	--- \\
+	\midrule
+	
+	Referencia normativa & 
+	Enunciado estático del examen o taller. & 
+	\acuerdo\ y estatuto académico real de la institución. & 
+	\textbf{Alta} (enunciado) / \textbf{Baja} (norma específica). \\
+	\midrule
+	
+	Resistencia al \textit{free-riding} & 
+	Baja: difícil verificar autoría en código entregado por medios digitales. & 
+	Alta: la discusión oral de las tarjetas de decisión requiere conocimiento propio. & 
+	--- \\
+	\midrule
+	
+	Evidencia de aprendizaje & 
+	Nota cuantitativa final. & 
+	Portafolio de decisiones de diseño con evolución documentada del sistema. & 
+	\textbf{Alta} / \textbf{Baja}. \\
+\end{longtable}
+\endgroup
+
+\subsection{El portafolio de decisiones como instrumento de evaluación}
+\label{subsec:portafolio}
+
+El portafolio de decisiones de diseño —acumulado a lo largo de los doce
+\textit{sprints} del libro— constituye el instrumento de evaluación más
+resistente al software generativo, habida cuenta de que documenta no el
+resultado sino el proceso deliberativo que condujo a cada elección de diseño.
+Una tarjeta de decisión bien elaborada responde a cinco preguntas: ¿qué
+alternativas de diseño se consideraron?, ¿cuál se eligió y por qué?, ¿qué
+artículo del \acuerdo\ sustenta la elección?, ¿qué se sacrificó al elegir
+esta alternativa?, y ¿qué pasaría si el requisito normativo cambiara? Ninguna
+de estas preguntas admite respuesta generada automáticamente de manera
+plausible sin comprensión del dominio.
+
+La evidencia acumulada en los doce sprints incluye: diagramas UML progresivos
+(Sprints~1--3, capítulos~\ref{cap:fundamentos}--\ref{cap:modelado}); código
+con Javadoc específico del dominio (Sprints~4--7, capítulos~\ref{cap:java}
+y~\ref{cap:rust}); suite de pruebas unitarias con invariantes normativas
+(Sprints~8--9, capítulo~\ref{cap:pruebas}); reflexiones de sprint escritas;
+y la reflexión crítica final del Sprint~12. Ese conjunto ---heterogéneo,
+longitudinal, con trazabilidad explícita--- es lo que permite al evaluador
+distinguir el razonamiento genuino del producido por delegación acrítica.
+
+\subsection{Limitaciones del modelo propuesto}
+\label{subsec:limitaciones-evaluacion}
+
+No resulta del todo claro que el modelo de evaluación centrado en razonamiento
+sea escalable en todos los contextos de la \ud. Un grupo de cuarenta estudiantes
+con un docente de tiempo completo puede sostener la revisión oral de las tarjetas
+de decisión; un grupo de ochenta con docentes de cátedra que dictan doce horas
+semanales en tres instituciones distintas difícilmente puede hacerlo. El autor
+reconoce esta limitación estructural: el modelo es pedagógicamente superior
+al examen tradicional, pero impone costos de evaluación que no todas las
+condiciones institucionales permiten absorber. Queda abierta la pregunta de cómo
+diseñar versiones de menor costo del portafolio de decisiones sin perder su
+ventaja evaluativa esencial.
+
+%% ─────────────────────────────────────────────
+\section{Marco ético para el uso responsable de software generativo}
+\label{sec:marco-etico}
+%% ─────────────────────────────────────────────
+
+\noindent
+La ética del software generativo en educación no es una cuestión abstracta
+de filosofía moral: es un conjunto de decisiones prácticas que las instituciones,
+los docentes y los estudiantes deben tomar con consecuencias reales y verificables.
+El marco que se propone aquí se articula en tres dimensiones ---transparencia,
+responsabilidad y equidad--- que no son independientes, sino imbricadas: la
+ausencia de cualquiera de ellas menoscaba las otras dos.
+
+\subsection{Transparencia: la declaración del uso de software generativo}
+\label{subsec:transparencia}
+
+Declarar que se empleó un asistente computacional generativo en la elaboración
+de un entregable académico no es una confesión de trampa: es un acto de honestidad
+intelectual. La transparencia exige que el estudiante especifique qué asistente
+empleó, para qué tarea concreta, en qué momento del proceso, y qué modificaciones
+realizó al resultado generado. Una declaración vaga ---«usé IA»--- no satisface
+el criterio de transparencia; una declaración precisa ---«empleé Claude 3.7 para
+generar el \textit{boilerplate} de los getters de la clase \texttt{UnidadAcademica},
+revisé el código con el protocolo de la sección~\ref{sec:analisis-critico} y
+corregí tres errores de dominio»--- sí lo satisface.
+
+La \ud, al momento de redactar este texto, no dispone de una política institucional
+explícita sobre el uso de software generativo en evaluaciones de programación.
+El autor propone que esa política se incorpore al reglamento estudiantil en un
+plazo razonable, estableciendo el formato de declaración de uso que se considerará
+aceptable.\footnote{En la Facultad de Ingeniería de la \ud, el autor ha implementado
+desde el segundo semestre de 2024 una ``declaración de autoría extendida'' que cada
+entregable debe incluir, especificando las fuentes ---humanas y computacionales---
+que contribuyeron al producto. La experiencia inicial sugiere que la declaración
+aumenta la reflexividad del estudiante respecto de su propio proceso, aunque no
+garantiza honestidad en todos los casos. El diseño de mecanismos de verificación
+queda como problema abierto.}
+
+\subsection{Responsabilidad: el estudiante es responsable del código que entrega}
+\label{subsec:responsabilidad}
+
+Con independencia del origen del código ---escrito por el estudiante, generado
+por un asistente, adaptado de un tutorial, producido en colaboración con un
+compañero--- el estudiante que lo entrega es responsable de su corrección y de
+su coherencia con el dominio. Esta responsabilidad no es mitigable por la
+procedencia del código: no existe, en términos académicos, la exculpación de
+«el asistente lo generó y yo no supe que estaba mal». Saber si está bien o mal
+es, precisamente, lo que el curso intenta enseñar.
+
+Esta dimensión implica que el protocolo de revisión crítica de la
+sección~\ref{sec:analisis-critico} no es opcional: es el ejercicio de la
+responsabilidad que el estudiante asume al entregar código de cualquier origen.
+Y si el estudiante no aplica el protocolo porque no lo conoce o porque el plazo
+es insuficiente, la responsabilidad de esa condición se distribuye entre el
+estudiante, el diseño del curso y la institución.
+
+\subsection{Equidad: la brecha de acceso a software generativo}
+\label{subsec:equidad}
+
+La tercera dimensión es, probablemente, la más incómoda para una institución
+pública. La diferencia entre un estudiante de la Pontificia Universidad Javeriana
+o de la Universidad de los Andes ---que dispone de laptop propia con GPU dedicada,
+acceso a versiones premium de múltiples asistentes generativos y conexión de
+alta velocidad desde su residencia--- y un estudiante de la \ud\ que comparte
+una sala de sistemas en la sede Macarena, con ancho de banda insuficiente en
+horas pico y acceso limitado a versiones gratuitas de estos sistemas, no es
+una diferencia de talento ni de esfuerzo: es una diferencia de infraestructura
+que el mercado produce y que la institución pública tiene la obligación de
+reconocer y gestionar.\footnote{El autor observó, durante el primer semestre
+de 2025, que varios estudiantes de estratos 1 y 2 de la \ud\ empleaban los
+kioscos de internet del barrio Santafé ---a tres cuadras de la sede Macarena---
+para acceder a asistentes generativos durante horas de la tarde, puesto que el
+ancho de banda de la sala de sistemas se congestionaba después de las 10 a.m.
+Esta observación no constituye evidencia sistemática, pero ilustra una condición
+estructural cuya invisibilización sería un error intelectual y una injusticia
+práctica.}
+
+La brecha generativa ---término empleado en la sección~\ref{subsec:penetracion-col}---
+no es inevitable. Requiere respuestas institucionales concretas: provisión de
+acceso a versiones educativas de asistentes generativos en las salas de sistemas,
+actualización del ancho de banda, capacitación de los docentes en el uso crítico
+de estos sistemas, y diseño de actividades que no presuponen acceso premium.
+Ninguna de estas respuestas es técnicamente imposible; todas implican decisiones
+presupuestales que la \ud\ deberá tomar con base en criterios de equidad educativa.
+
+La Tabla~\ref{tab:marco-etico} sintetiza las tres dimensiones del marco ético.
+
+\begingroup
+\small
+\begin{longtable}{@{} L{2.5cm} L{4.2cm} L{4.2cm} L{3.1cm} @{} }
+	% --- Título y encabezado de la primera página ---
+	\caption{Dimensiones del marco ético para el uso de software generativo en el contexto académico de la \ud. Elaboración del autor.} \label{tab:marco-etico} \\
+	\toprule
+	\textbf{Dimensión} & \textbf{Definición operativa} & \textbf{Ejemplo institucional} & \textbf{Mecanismo propuesto} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Dimensión} & \textbf{Definición operativa} & \textbf{Ejemplo institucional} & \textbf{Mecanismo propuesto} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Transparencia & 
+	Declarar el uso de asistentes generativos, especificando el sistema, la tarea y las modificaciones realizadas por el autor. & 
+	Inclusión en los entregables de una sección «Declaración de uso de IA» con formato estructurado por el docente. & 
+	Formato de declaración estándar integrado en el reglamento de la asignatura. \\
+	\midrule
+	
+	Responsabilidad & 
+	El estudiante que entrega el código es el único responsable de su corrección, independientemente de su origen tecnológico. & 
+	Si el código del Sprint~5 viola el Art.~31 del \acuerdo, el estudiante no puede excusarse en el error del asistente. & 
+	Inclusión explícita del principio de autoría en el contrato pedagógico del curso. \\
+	\midrule
+	
+	Equidad & 
+	Reconocimiento institucional de la brecha de acceso y gestión activa para garantizar igualdad de oportunidades. & 
+	Acceso gratuito a versiones Pro en salas de sistemas; ancho de banda garantizado para todos durante la clase. & 
+	Convenio institucional con proveedores; inversión en infraestructura de red y licencias educativas. \\
+\end{longtable}
+\endgroup
+
+\subsection{Recomendaciones de política para la \ud}
+\label{subsec:recomendaciones-politica}
+
+A partir del marco ético propuesto, se formulan cuatro recomendaciones concretas
+de política para la Facultad de Ingeniería de la \ud, en el entendido de que
+ninguna institución de educación superior puede permitirse ignorar la irrupción
+de estos sistemas en los entornos de aprendizaje:
+
+\begin{enumerate}[label=\arabic*.]
+  \item Establecer una política explícita sobre el uso de software generativo
+        en evaluaciones de programación, diferenciando los tipos de evaluación
+        (formativa, sumativa, acreditación de competencias) y los niveles de
+        autonomía permitidos.
+  \item Garantizar acceso equitativo a versiones educativas de al menos un
+        asistente computacional generativo de calidad comparable a los disponibles
+        en universidades privadas de la ciudad, gestionado mediante convenio
+        institucional.
+  \item Incorporar en los planes de estudio de los programas de ingeniería
+        de sistemas al menos una asignatura o componente curricular dedicado al
+        análisis crítico del software generativo, sus fundamentos técnicos,
+        sus limitaciones y sus implicaciones éticas.
+  \item Revisar el Reglamento Estudiantil para incluir una definición precisa
+        de las conductas constituyen deshonestidad académica en el contexto
+        del software generativo, diferenciándolas del uso legítimo y declarado.
+\end{enumerate}
+
+%% ─────────────────────────────────────────────
+\section{Comparativa \java\ vs.\ \rust: experiencia con asistentes generativos}
+\label{sec:java-rust-generativo}
+%% ─────────────────────────────────────────────
+
+\noindent
+Un aspecto que la literatura disponible aborda de manera insuficiente ---al menos
+en lo que el autor ha podido revisar al momento de redactar este texto--- es la
+diferencia cualitativa en la calidad del código generado por asistentes
+computacionales para \java\ y para \rust\ en el contexto del aprendizaje
+de la POO. Esa diferencia no es trivial, y tiene repercusiones directas
+sobre las estrategias pedagógicas que se adoptan en las asignaturas de
+la Facultad de Ingeniería de la \ud.\footnote{Las observaciones que se
+documentan en esta sección son cualitativas y no constituyen evidencia
+empírica controlada. Se trata de impresiones acumuladas a lo largo del
+primer semestre de 2025 en dos asignaturas: Programación Orientada a Objetos
+(sexto semestre) y Paradigmas de Programación (octavo semestre). El autor
+advierte que la extrapolación exige cautela y que un estudio controlado
+con diseño experimental riguroso podría arrojar resultados distintos.}
+
+\subsection{La asimetría del corpus de entrenamiento}
+\label{subsec:asimetria-corpus}
+
+La razón de la diferencia cualitativa es, en principio, sencilla de enunciar:
+\java\ existe desde 1995 y cuenta con más de dos décadas de código público
+en repositorios, foros, tutoriales, libros y proyectos de código abierto.
+El corpus de entrenamiento de los principales asistentes computacionales
+generativos contiene, razonablemente, varias veces más código \java\ que
+código \rust\ ---lenguaje cuya especificación estabilizada data de 2015 y cuya
+adopción masiva en proyectos de código abierto se aceleró principalmente a
+partir de 2020. Más corpus no garantiza mejor calidad para un dominio específico,
+pero sí produce mayor familiaridad con los patrones sintácticamente correctos del lenguaje.
+
+Pero la diferencia no es solo cuantitativa. \rust\ introduce conceptos ---el
+sistema de \textit{ownership}, el \textit{borrow checker}, los tiempos de vida,
+los tipos afines--- que no tienen equivalente en los lenguajes más representados
+en el corpus \parencite{Klabnik2023}. El asistente generativo ha ``visto'' millones de líneas de código
+con referencias nulas en \java, \texttt{C\#} y Python; ha ``visto'' considerablemente
+menos código que gestiona correctamente los préstamos de referencias en \rust.
+El resultado es predecible: el código \rust\ generado comete con mayor frecuencia
+errores de \textit{ownership} y \textit{lifetime} que el código \java\ generado
+comete errores equivalentes de gestión de referencias.
+
+\subsection{Observaciones cualitativas del autor}
+\label{subsec:observaciones-java-rust}
+
+Cuatro patrones de error se observaron de manera recurrente en el código \rust\
+generado por asistentes durante el primer semestre de 2025:
+
+\begin{itemize}
+  \item \textbf{Clonado innecesario}: el asistente resuelve conflictos de
+        \textit{ownership} mediante llamadas a \texttt{.clone()} donde el
+        diseño correcto emplearía préstamos (\textit{borrows}). El código
+        compila, pero desperdicia memoria y viola la semántica de propiedad.
+
+  \item \textbf{\textit{Lifetimes} explícitos omitidos}: el asistente omite
+        anotaciones de tiempo de vida donde el compilador las requiere,
+        produciendo errores que el estudiante novel no puede interpretar
+        fácilmente.
+
+  \item \textbf{Uso de \texttt{unwrap()} sin tratamiento de errores}:
+        el asistente generativo frecuentemente sustituye el manejo
+        correcto de \texttt{Result<T, E>} con llamadas a \texttt{.unwrap()},
+        que producen \textit{panics} en tiempo de ejecución ante condiciones
+        que el código debería manejar de manera explícita.
+
+  \item \textbf{Estructuras con estado mutable compartido}:
+        el asistente propone con frecuencia el uso de \texttt{\texttt{Rc\textless RefCell\textless T\textgreater\textgreater}}
+        donde el diseño sintácticamente correcto de \rust\ emplearía patrones de propiedad
+        exclusiva o mensajería mediante canales, lo que suscita código correcto
+        en apariencia pero contrario al espíritu del lenguaje.
+        
+\end{itemize}
+
+Para \java, los errores de dominio son más frecuentes que los errores sintacticos.
+El asistente produce código que sigue las convenciones del lenguaje razonablemente
+bien, pero que viola las restricciones del \acuerdo\ tal como ilustraron los
+ejemplos de la sección~\ref{subsec:ejemplos-violacion}. En \rust, los errores
+son tanto de dominio como sintácticamente correctos, lo que duplica la carga de revisión
+crítica para el estudiante.
+
+\subsection{Tabla comparativa de calidad del código generado}
+\label{subsec:tabla-comparativa}
+
+La Tabla~\ref{tab:java-rust-generativo} sintetiza las diferencias observadas
+entre el código \java\ y \rust\ generado por asistentes computacionales.
+
+\begingroup
+\small
+\begin{longtable}{@{} L{3cm} L{3.8cm} L{3.8cm} L{3.2cm} @{} }
+	% --- Título y encabezado de la primera página ---
+	\caption{Comparación cualitativa de la calidad del código generado para \java\ y \rust\ (Sistema Estatutario \ud). Elaboración del autor.} \label{tab:java-rust-generativo} \\
+	\toprule
+	\textbf{Aspecto} & \textbf{Calidad \java} & \textbf{Calidad \rust} & \textbf{Observación} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Aspecto} & \textbf{Calidad \java} & \textbf{Calidad \rust} & \textbf{Observación} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Idiomaticidad & 
+	\textbf{Alta}: Cumple convenciones de nombres, estructura de paquetes y Javadoc estándar. & 
+	\textbf{Media-baja}: Clonado innecesario (\textit{over-cloning}) y uso de \texttt{unwrap()} excesivo. & 
+	Relacionado con la densidad del corpus de entrenamiento disponible para cada lenguaje. \\
+	\midrule
+	
+	Corrección de dominio & 
+	\textbf{Media}: Errores semánticos frecuentes por falta de contexto normativo local. & 
+	\textbf{Media}: Los mismos errores de dominio más errores sintácticos adicionales. & 
+	Ningún asistente conoce el \acuerdo\ sin que se le proporcione explícitamente en el \textit{prompt}. \\
+	\midrule
+	
+	Manejo de errores & 
+	\textbf{Correcto}: Uso convencional de bloques \texttt{try-catch}. & 
+	\textbf{Incorrecto}: Uso de \texttt{unwrap()} en lugar de la propagación sintácticamente correcta con el operador \texttt{?}. & 
+	El asistente tiende a minimizar la longitud del código, no a maximizar su robustez sistémica. \\
+	\midrule
+	
+	Herencia y polimorfismo & 
+	\textbf{Estable}: Bien gestionado para jerarquías simples; errores en jerarquías profundas ($>3$ niveles). & 
+	\textbf{Inestable}: \textit{Traits} básicos correctos; despacho dinámico (\texttt{dyn Trait}) frecuentemente incorrecto. & 
+	La complejidad del dominio (Estatuto Académico) amplifica los errores de lógica del asistente. \\
+	\midrule
+	
+	Compilabilidad inmediata & 
+	\textbf{Alta}: Estimación entre el 70\% y el 85\% de los listados generados compilan sin cambios. & 
+	\textbf{Media}: Estimación entre el 40\% y el 60\%; el \textit{borrow checker} rechaza la mayoría. & 
+	\textbf{Crítico}: La compilabilidad no debe confundirse con la corrección semántica o normativa. \\
+\end{longtable}
+\endgroup
+
+La implicación pedagógica de esta asimetría es concreta: el docente que emplea
+\rust\ en un curso de POO puede aprovechar los errores del asistente como
+material de análisis, puesto que son más visibles y más frecuentes que en \java.
+El error de \textit{borrow checker} que el asistente produce y que el
+compilador rechaza es, paradójicamente, más pedagógicamente valioso que el
+código \java\ que compila sin error pero viola el dominio: el primero es
+detectable; el segundo no lo es sin el protocolo de la
+sección~\ref{sec:analisis-critico}.
+
+Y sin embargo, la asimetría plantea también un riesgo: el estudiante que trabaja
+principalmente con \java\ puede desarrollar una confianza excesiva en el código
+generado, precisamente porque compila y luce correcto. Esa confianza no justificada
+es, en opinión del autor, el riesgo pedagógico de mayor trascendencia que el
+software generativo introduce en los cursos de programación orientada a objetos.
+
+%% ─────────────────────────────────────────────────────────────────
+%% SPRINT 12
+%% ─────────────────────────────────────────────────────────────────
+\section*{Sprint 12: Integración, entrega final y reflexión crítica}
+\label{sprint:12}
+\addcontentsline{toc}{section}{Sprint 12: Integración, entrega final y reflexión crítica}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 12 --- Integración, entrega final y reflexión crítica}]
+  \textbf{Duración estimada:} 2 semanas \\[4pt]
+  \textbf{Objetivo general:} Integrar la totalidad de los módulos del sistema
+  de información estatutario (organizacional, académico, evaluación y calidad)
+  desarrollados en los Sprints~1--11; ejecutar la batería completa de pruebas
+  con cobertura mínima del 80\,\%; preparar y sustentar la presentación final
+  ante un panel evaluador; y producir la reflexión crítica escrita sobre el
+  proceso de aprendizaje y el papel del software generativo a lo largo de los
+  doce \textit{sprints}. \\[4pt]
+  \textbf{Prerrequisitos:} Todos los módulos de los Sprints~1--11 compilando
+  individualmente; suite de pruebas de los Sprints~8--11 pasando; diagramas UML
+  finales coherentes con el código entregado.
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Tabla del Sprint 12}
+\label{tab:sprint12-header}
+
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4.5cm}}
+  \sprintcabecera
+  \endhead
+  %% ── Fila 1 ──
+  Sistema integrado compilable y ejecutable: todos los módulos
+  (organizacional, académico, evaluación) conectados mediante la
+  capa de servicio, con batería completa de pruebas pasando
+  ($\geq$80\,\% de cobertura según JaCoCo en \java\
+  y \texttt{cargo tarpaulin} en \rust)
+  & Integrar los módulos desarrollados en los Sprints~4--11 en un
+    sistema coherente, verificar que las interfaces entre módulos
+    respetan los contratos definidos en los diagramas UML, y
+    documentar el proceso de integración en el informe técnico final
+  & El sistema integrado compila sin errores, ejecuta el flujo
+    completo desde la interfaz gráfica hasta la persistencia, y
+    todas las pruebas de regresión pasan; la cobertura de ramas
+    supera el 80\,\% \\
+  \midrule
+  %% ── Fila 2 ──
+  Informe técnico de integración: documento de 8--12 páginas que
+  describe la arquitectura final del sistema, las decisiones de
+  integración tomadas, los conflictos encontrados y cómo se
+  resolvieron, y las lecciones aprendidas
+  & Comunicar de manera estructurada el proceso de integración,
+    con énfasis en las decisiones de diseño que debieron adaptarse
+    al integrar módulos desarrollados en momentos distintos del semestre
+  & El informe documenta al menos tres decisiones de integración
+    no triviales con argumentación técnica; referencia los diagramas
+    UML de los sprints anteriores para mostrar la evolución \\
+  \midrule
+  %% ── Fila 3 ──
+  Presentación final del proyecto (15--20 minutos) con demostración
+  en vivo del sistema integrado y sustentación oral de las decisiones
+  de diseño más relevantes ante un panel evaluador de dos o tres docentes
+  & Demostrar comprensión profunda del sistema desarrollado, capacidad
+    de argumentar las decisiones de diseño orientado a objetos y habilidad
+    para responder preguntas técnicas sobre el código y el dominio
+  & La presentación demuestra dominio del dominio estatutario y de los
+    principios POO; las respuestas a las preguntas del panel revelan
+    comprensión genuina de las decisiones de diseño y sus alternativas \\
+  \midrule
+  %% ── Fila 4 ──
+  Portafolio de decisiones de diseño: consolidación y revisión de las
+  tarjetas de decisión producidas en los doce \textit{sprints}, organizadas
+  cronológicamente y con una sección de reflexión sobre la evolución del
+  pensamiento de diseño del estudiante
+  & Documentar la trayectoria de aprendizaje en diseño orientado a
+    objetos a lo largo del semestre, identificando los momentos de
+    mayor claridad conceptual y los escollos superados
+  & El portafolio contiene al menos doce tarjetas de decisión no
+    triviales; la sección de reflexión sobre evolución del pensamiento
+    de diseño es específica y evidencia metacognición genuina \\
+  \midrule
+  %% ── Fila 5 ──
+  Reflexión crítica escrita sobre el proceso de aprendizaje y el
+  empleo de software generativo (mínimo 1.000 palabras, máximo 2.000),
+  siguiendo la estructura y la rúbrica de la actividad final del Sprint~12
+  & Desarrollar metacognición sobre el propio proceso de aprendizaje de
+    la POO y el papel que el software generativo tuvo en él; formular
+    una posición ética argumentada y una pregunta de investigación derivada
+    de la experiencia propia
+  & La reflexión evidencia pensamiento crítico no descriptivo; distingue
+    con precisión el conocimiento propio del generado; formula una posición
+    ética coherente con el marco de la sección~\ref{sec:marco-etico} y
+    una pregunta de investigación específica y pertinente \\
+  \midrule
+  %% ── Fila 6 ──
+  Versión final en \rust: adaptación del módulo organizacional y
+  del módulo de evaluación al sistema de tipos de \rust, con al menos
+  tres \textit{traits} propios del dominio implementados y documentados,
+  y pruebas que verifiquen el comportamiento del \textit{borrow checker}
+  en escenarios de propiedad compartida
+  & Demostrar comprensión del modelo de propiedad de \rust\ aplicado al
+    dominio estatutario, y contrastar explícitamente las decisiones de
+    diseño en \rust\ con las tomadas en \java\
+  & El código \rust\ es sintácticamente correcto; emplea \texttt{Result<T,E>} para
+    el manejo de errores sin \texttt{unwrap()} en código de producción;
+    el estudiante justifica las diferencias de diseño respecto de \java\
+    con argumentación propia en las tarjetas de decisión \\
+  \bottomrule
+  \caption{Entregables, características y criterios de la rúbrica del Sprint~12.}
+  \label{tab:sprint12}
+\end{longtable}
+
+%% ─── Rúbrica integral ────────────────────────
+\subsection*{Rúbrica integral del proyecto}
+\label{rubrica-integral}
+
+\begin{longtable}{L{3cm} L{1.8cm} L{3cm} L{3cm} L{3cm}}
+  \toprule
+  \textbf{Dimensión} & \textbf{Peso} &
+  \textbf{Insuficiente (1--2)} &
+  \textbf{Aceptable (3)} &
+  \textbf{Sobresaliente (4--5)} \\
+  \midrule
+  \endhead
+  %% ── D1 ──
+  Modelado UML del dominio
+  & 20\,\%
+  & El diagrama de clases omite entidades o relaciones del estatuto;
+    las decisiones de herencia no se justifican; la multiplicidad
+    de las relaciones es incorrecta o ausente
+  & El diagrama es coherente con el estatuto; se justifican la mayoría
+    de las decisiones de herencia y composición; la multiplicidad
+    es correcta en las relaciones principales
+  & El diagrama es completo y preciso; todas las decisiones se justifican
+    con argumentación orientada a objetos y referencia explícita al artículo
+    del \acuerdo\ aplicable; el modelo evolucionó de manera documentada
+    a lo largo de los doce sprints \\
+  \midrule
+  %% ── D2 ──
+  Implementación \java
+  & 25\,\%
+  & El código compila con errores o no refleja el modelo UML;
+    el Javadoc es ausente o genérico y no referencia el dominio;
+    los invariantes del estatuto no se verifican en el código
+  & El código es funcional y coherente con el modelo; el Javadoc
+    cubre los métodos principales con información específica del dominio;
+    al menos las restricciones del estatuto más relevantes se validan
+  & El código aplica herencia, polimorfismo y encapsulamiento de manera
+    correcta; el Javadoc es preciso y referencia los artículos del
+    \acuerdo\ donde corresponde; se aplican al menos dos patrones de
+    diseño justificados en las tarjetas de decisión \\
+  \midrule
+  %% ── D3 ──
+  Implementación \rust
+  & 20\,\%
+  & El código no compila o viola el sistema de \textit{ownership};
+    emplea \texttt{unwrap()} sistemáticamente; los \textit{traits}
+    implementados no corresponden al dominio
+  & El código compila; los \textit{traits} propios del dominio se
+    implementan correctamente; el manejo de errores emplea \texttt{Result}
+    en los casos principales; el estudiante entiende los errores
+    del \textit{borrow checker}
+  & El código es sintácticamente correcto en \rust; no hay \texttt{unwrap()} en código
+    de producción; el estudiante justifica las diferencias de diseño
+    respecto de \java\ con argumentación propia y documentada \\
+  \midrule
+  %% ── D4 ──
+  Pruebas y calidad
+  & 15\,\%
+  & Menos del 50\,\% de cobertura; las pruebas son triviales y no
+    verifican invariantes del dominio; no hay pruebas de regresión
+  & Cobertura $\geq$ 70\,\%; las pruebas verifican al menos cinco
+    invariantes del dominio definidos por el \acuerdo; hay
+    pruebas de casos de borde
+  & Cobertura $\geq$ 80\,\%; las pruebas verifican restricciones
+    normativas del estatuto con referencia explícita al artículo aplicable;
+    el código refactorizado a lo largo de los sprints preserva
+    el comportamiento verificado \\
+  \midrule
+  %% ── D5 ──
+  Reflexión crítica sobre software generativo
+  & 20\,\%
+  & La reflexión es descriptiva o laudatoria sin análisis crítico;
+    no distingue el conocimiento propio del generado; no formula
+    posición ética ni pregunta de investigación
+  & La reflexión identifica oportunidades y riesgos del software
+    generativo con ejemplos del propio proceso; formula una posición
+    ética básica; propone una pregunta de investigación pertinente
+  & La reflexión evidencia pensamiento crítico profundo; contrasta
+    evidencia propia con el marco ético de la
+    sección~\ref{sec:marco-etico}; distingue con precisión el
+    conocimiento propio del generado; formula una pregunta de
+    investigación específica y derivada de la experiencia \\
+  \bottomrule
+  \caption{Rúbrica integral del proyecto a lo largo de los doce \textit{sprints}.}
+  \label{tab:rubrica-integral}
+\end{longtable}
+
+\bigskip
+
+\subsection*{Actividad final de reflexión sobre software generativo}
+\label{act:ia-sprint12}
+
+\begin{tcolorbox}[actividadIA,
+  title={Actividad final de reflexión (Sprint~12) ---
+         Software generativo y aprendizaje de la \poo}]
+
+\textbf{Instrucción general.}
+Al concluir los doce \textit{sprints} del libro, el estudiante redacta una
+reflexión crítica ---mínimo 1.000 palabras, máximo 2.000--- sobre el papel
+del software generativo en su proceso de aprendizaje de la programación
+orientada a objetos. La reflexión no es un resumen del proyecto: es un
+análisis argumentado del propio proceso, con evidencia extraída de las
+tarjetas de decisión, los diagramas UML y el código producido a lo largo
+del semestre. El uso de asistentes computacionales generativos para redactar
+esta reflexión debe declararse explícitamente y desvirtúa el propósito del
+ejercicio: lo que se evalúa es el razonamiento del estudiante sobre su propia
+experiencia, no la fluidez del texto producido.
+
+\bigskip
+\textbf{Estructura sugerida (no obligatoria):}
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+  \item \textbf{Inventario de usos.}
+        ¿En qué \textit{sprints} y para qué tareas específicas empleó el
+        asistente computacional? Sea preciso: no «usé IA para programar»,
+        sino «en el Sprint~5, empleé GitHub Copilot para generar los métodos
+        \textit{getter} de las clases \texttt{Facultad} y \texttt{ProyectoCurricular},
+        y Claude 3.7 para entender el error de \textit{lifetime} en la
+        implementación \rust\ de la relación entre \texttt{Escuela} y
+        \texttt{Docente}». El inventario debe incluir, para cada uso, si
+        el resultado fue empleado directamente, modificado o descartado.
+
+  \item \textbf{Análisis de valor.}
+        ¿En qué casos el asistente generó valor genuino para el aprendizaje?
+        ¿En qué casos resultó contraproducente? Proporcione al menos dos
+        ejemplos de cada tipo, referenciando código o decisiones de diseño
+        concretos. Un ejemplo de valor genuino puede ser la explicación de
+        un mensaje de error que el estudiante no habría podido descifrar
+        en el tiempo disponible. Un ejemplo de efecto contraproducente puede
+        ser la aceptación de una jerarquía de herencia incorrecta que el
+        asistente generó y que el estudiante no revisó con el protocolo
+        de la sección~\ref{sec:analisis-critico}.
+
+  \item \textbf{Autoevaluación del aprendizaje.}
+        ¿Qué conceptos de diseño orientado a objetos comprendió genuinamente
+        a lo largo de los doce \textit{sprints}? ¿Cuáles quedaron pendientes
+        o se comprenden sólo superficialmente? ¿En qué medida el empleo del
+        asistente computacional incidió en esa brecha? La autoevaluación debe
+        ser honesta y específica: declarar que «aprendí POO» no satisface el
+        criterio; declarar que «comprendí el principio de sustitución de Liskov
+        en el Sprint~6 al intentar usar \texttt{DocentePlanta} donde el código
+        esperaba \texttt{Docente}, y que el asistente no me ayudó a entender
+        por qué eso era un error de diseño» sí lo satisface.
+
+  \item \textbf{Posición ética.}
+        ¿Cómo declararía el uso del asistente en la entrega del proyecto?
+        ¿Bajo qué condiciones considera que el empleo de software generativo
+        en evaluaciones de programación es éticamente aceptable? ¿Y bajo qué
+        condiciones considera que constituye deshonestidad académica? La
+        posición debe ser argumentada, no meramente declarativa: debe
+        sustentarse en los principios del marco ético de la
+        sección~\ref{sec:marco-etico} y en la experiencia propia del semestre.
+
+  \item \textbf{Pregunta abierta de investigación.}
+        Formule una pregunta de investigación sobre el empleo de software
+        generativo en el aprendizaje de la programación orientada a objetos
+        que usted considera relevante y no resuelta. La pregunta debe ser
+        derivada de la experiencia propia, específica ---no «¿son buenos o malos
+        los asistentes computacionales?»--- y pertinente para el contexto de la \ud\
+        y las universidades públicas colombianas. Por ejemplo: «¿Existe
+        diferencia estadísticamente significativa en la comprensión del
+        principio de responsabilidad única entre estudiantes que emplearon
+        software generativo para generar las clases de dominio y estudiantes
+        que las escribieron manualmente, controlando por el nivel de experiencia
+        previa en programación?»
+\end{enumerate}
+
+\bigskip
+\textbf{Rúbrica de evaluación de la reflexión final:}
+
+\begin{tabular}{L{3cm} L{3cm} L{3cm} L{3cm}}
+  \toprule
+  \textbf{Criterio} &
+  \textbf{Insuficiente (1)} &
+  \textbf{Aceptable (2--3)} &
+  \textbf{Sobresaliente (4--5)} \\
+  \midrule
+  Análisis crítico
+  & Meramente descriptivo; el estudiante enumera lo que hizo sin
+    tomar posición argumentada sobre el valor o el riesgo del
+    software generativo
+  & Identifica fortalezas y limitaciones del software generativo
+    con ejemplos del propio proceso; la posición es reconocible
+    aunque no siempre está argumentada
+  & Argumentación profunda con ejemplos del propio código y
+    referencias a los conceptos del libro; la posición es
+    coherente, matizada y sustentada en evidencia del semestre \\
+  \midrule
+  Autoevaluación del aprendizaje
+  & No distingue lo que aprendió genuinamente de lo que el
+    asistente computacional hizo en su lugar; no identifica
+    brechas de comprensión
+  & Identifica aprendizajes propios con algún nivel de especificidad
+    pero sin contraste crítico sistemático con el uso del asistente;
+    reconoce algunas brechas
+  & Distingue con precisión el conocimiento construido del delegado;
+    formula hipótesis específicas sobre el efecto del asistente
+    en su aprendizaje de cada principio de POO \\
+  \midrule
+  Posición ética
+  & Ausente, acrítica o meramente declarativa;
+    no argumenta por qué su posición es la correcta
+  & Formula una posición básica sobre el uso ético del software
+    generativo, con alguna argumentación; reconoce que existen
+    condiciones que determinan la aceptabilidad del uso
+  & Formula una posición argumentada, matizada y coherente con
+    el marco ético de la sección~\ref{sec:marco-etico};
+    distingue tipos de uso según el nivel de formación, el tipo
+    de evaluación y la disponibilidad equitativa de acceso \\
+  \midrule
+  Pregunta de investigación
+  & Ausente, trivial o tan amplia que no es investigable;
+    no se deriva de la experiencia propia
+  & Pertinente y conectada a la experiencia propia pero
+    demasiado amplia o con diseño de investigación no esbozado;
+    podría transformarse en pregunta investigable con orientación
+  & Pertinente, específica, derivada de la experiencia propia
+    del semestre y con potencial de investigación empírica en
+    el contexto de la \ud\ u otras universidades públicas
+    colombianas; el estudiante esboza un posible diseño de estudio \\
+  \bottomrule
+\end{tabular}
+
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Cierre del libro: lo que permanece después del software generativo}
+\label{subsec:cierre}
+
+\noindent
+Al concluir los doce \textit{sprints}, el estudiante dispone de un sistema
+de información funcional, de un portafolio de decisiones de diseño, de pruebas
+que verifican invariantes del \acuerdo, y ---si el proceso fue genuino--- de una
+comprensión que ningún asistente computacional pudo producir por él: la intuición
+de diseño que se construye al enfrentarse repetidamente al problema de modelar
+un dominio complejo y al costo de las decisiones equivocadas.
+
+Esa intuición no es transferible de un asistente a un estudiante. Se construye
+iterativamente, en el error y en la revisión, en el momento en que el compilador
+de \rust\ rechaza una referencia que el estudiante consideraba válida y lo obliga
+a pensar en quién posee el valor. En el momento en que el revisor detecta que
+la jerarquía de unidades académicas viola el artículo del estatuto y el estudiante
+debe rehacer el diagrama desde la raíz. En el momento en que la prueba falla
+porque el dominio tiene una restricción que el código ignoraba.
+
+El software generativo puede acelerar algunas partes de ese proceso. Pero el
+proceso mismo ---el encuentro repetido con la complejidad de un dominio real,
+la negociación entre lo que el código permite y lo que la norma exige, la
+búsqueda de la abstracción que hace al sistema extensible sin romper lo que ya
+funciona--- ese proceso es irreductiblemente propio. Queda la duda de si la
+generación siguiente de asistentes computacionales cambiará esta afirmación.
+Por ahora, no resulta del todo claro que lo haga.

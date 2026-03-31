@@ -1,0 +1,1281 @@
+%% ============================================================
+%% cap05.tex — Capítulo 5: Implementación en Rust
+%% Programación Orientada a Objetos: Diseño e Implementación
+%% de un Sistema de Información Académico-Administrativo
+%% para la Universidad Distrital Francisco José de Caldas
+%%
+%% Autor: Roberto Albeiro Pava-Díaz, Ph.D.
+%% ============================================================
+
+\chapter{Implementación en \rust}
+\label{cap:rust}
+
+
+\noindent
+El estudio de \rust\ en un libro de \poo\ requiere una aclaración inicial, toda
+vez que \rust\ no es un lenguaje orientado a objetos en el sentido clásico. No
+posee clases, no admite herencia de structs y no tiene un modelo de objetos con
+identidad mutable implícita. Sin embargo, los principios fundamentales de la
+orientación a objetos ---encapsulamiento, abstracción, polimorfismo--- se logran
+en \rust\ mediante mecanismos disímiles: los \texttt{struct} encapsulan estado,
+los \texttt{trait} definen comportamiento abstracto, y el \textit{despacho dinámico}
+(\texttt{dyn Trait}) habilita el polimorfismo en tiempo de ejecución.\footnote{Esta
+aproximación pragmática a la POO en Rust ha sido caracterizada por \textcite{Klabnik2023}
+como ``composición sobre herencia'', principio que coincide con las recomendaciones
+de \textcite{Gamma1994} para el diseño orientado a objetos flexible.}
+
+El propósito de implementar el mismo dominio estatutario en \rust\ no es demostrar
+que un lenguaje es superior al otro. Es suscitar reflexiones sobre por qué ciertos
+conceptos de la POO ---herencia, excepciones, referencias nulas--- se diseñaron de
+determinada manera y qué costos y beneficios conllevan. Queda la duda ---y
+deliberadamente se deja abierta--- de si el modelo de tipos de \rust\ habría evitado
+errores históricos en sistemas de información universitaria cuya falla se debió,
+precisamente, a referencias nulas no controladas.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Fundamentos de \rust}
+\label{sec:rust-fundamentos}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+Antes de examinar la implementación del dominio, conviene establecer los tres pilares
+conceptuales de \rust\ que mayor impacto tienen en el diseño del sistema: el modelo
+de propiedad (\textit{ownership}), el préstamo de referencias (\textit{borrowing})
+con sus tiempos de vida (\textit{lifetimes}), y el sistema de tipos que reemplaza
+los valores nulos y las excepciones.
+
+\subsection{Ownership, borrowing y lifetimes}
+\label{subsec:ownership}
+
+El sistema de propiedad de \rust\ establece que cada valor tiene un único propietario
+(\textit{owner}) en un instante dado. Cuando el propietario sale del alcance
+(\textit{scope}), el valor es liberado automáticamente, sin recolector de basura.
+Este mecanismo elimina las fugas de memoria por diseño, no por convención.\footnote{El
+modelo de ownership fue formalizado por Matsakis y Klock (\cite{matsakis2014}) y
+constituye la contribución más original de Rust al diseño de lenguajes de sistemas.}
+
+\begin{lstlisting}[style=rustStyle, caption={Ownership y borrowing aplicados al dominio}, label={lst:ownership}]
+// Demostración de ownership y borrowing
+// usando las entidades del dominio estatutario
+
+/// Representa una Escuela con su lista de docentes.
+/// La Escuela es propietaria (owner) de sus docentes.
+struct Escuela {
+    nombre:   String,
+    codigo:   String,
+    docentes: Vec<Docente>,
+}
+
+struct Docente {
+    nombre:         String,
+    identificacion: String,
+    tipo:           TipoDocente,
+}
+
+// ── Ejemplo 1: Move semantics ──────────────────────────────────────────────
+
+fn ejemplo_move() {
+    let escuela1 = Escuela {
+        nombre:   String::from("Ingeniería de Sistemas"),
+        codigo:   String::from("EIS"),
+        docentes: Vec::new(),
+    };
+    // escuela1 se mueve (move) a escuela2; ya no es accesible por escuela1
+    let escuela2 = escuela1;
+    println!("Escuela: {}", escuela2.nombre);
+    // println!("{}", escuela1.nombre); // ERROR de compilación: moved value
+}
+
+// ── Ejemplo 2: Borrowing inmutable ─────────────────────────────────────────
+
+/// Imprime el nombre de la escuela sin tomar propiedad.
+/// El parámetro es una referencia inmutable (&Escuela).
+fn imprimir_escuela(escuela: &Escuela) {
+    println!("Escuela: {} ({})", escuela.nombre, escuela.codigo);
+    // No se puede modificar escuela aquí
+}
+
+// ── Ejemplo 3: Borrowing mutable ───────────────────────────────────────────
+
+/// Agrega un docente a la escuela.
+/// El parámetro es una referencia mutable (&mut Escuela).
+/// En un instante dado solo puede existir UNA referencia mutable.
+fn agregar_docente(escuela: &mut Escuela, docente: Docente) {
+    escuela.docentes.push(docente);
+}
+
+// ── Ejemplo 4: Lifetimes ────────────────────────────────────────────────────
+
+/// Retorna una referencia al docente con mayor antigüedad.
+/// El lifetime 'a garantiza que la referencia retornada
+/// no vive más que la escuela de donde proviene.
+fn docente_mas_antiguo<'a>(escuela: &'a Escuela) -> Option<&'a Docente> {
+    escuela.docentes.first()
+}
+
+fn main() {
+    let mut escuela = Escuela {
+        nombre:   String::from("Ing. de Sistemas"),
+        codigo:   String::from("EIS"),
+        docentes: Vec::new(),
+    };
+
+    let docente = Docente {
+        nombre:         String::from("Prof. Ejemplo"),
+        identificacion: String::from("12345678"),
+        tipo:           TipoDocente::Planta,
+    };
+
+    agregar_docente(&mut escuela, docente);
+    imprimir_escuela(&escuela);
+
+    if let Some(d) = docente_mas_antiguo(&escuela) {
+        println!("Primer docente: {}", d.nombre);
+    }
+}
+\end{lstlisting}
+
+\noindent
+El listado~\ref{lst:ownership} ilustra un aspecto que los estudiantes provenientes
+de \java\ encuentran sorprendente: la operación \texttt{let escuela2 = escuela1}
+no copia el objeto, sino que transfiere la propiedad (\textit{move}). La variable
+\texttt{escuela1} queda inválida después de esa línea. Este comportamiento, que
+inicialmente parece una restricción arbitraria, es la garantía de que nunca
+existirán dos propietarios simultáneos del mismo dato: condición suficiente para
+eliminar las condiciones de carrera (\textit{data races}) en programas concurrentes.
+
+\subsection{Structs, enums y traits}
+\label{subsec:structs-traits}
+
+Los \texttt{struct} de \rust\ encapsulan datos; los \texttt{trait} definen el
+comportamiento abstracto que los structs pueden implementar. Esta separación entre
+datos y comportamiento difiere del modelo de clases de \java\ ---donde datos y métodos
+coexisten en la misma unidad--- pero permite una composición más flexible, puesto que
+un struct puede implementar múltiples traits sin las restricciones del grafo de herencia.
+
+\begin{lstlisting}[style=rustStyle, caption={Structs, enums y traits del dominio}, label={lst:structs-traits}]
+use std::fmt;
+
+// ─── Enumeraciones ──────────────────────────────────────────────────────────
+
+/// Tipos de vinculación docente (Acuerdo 004 de 2025, Art. 8).
+#[derive(Debug, Clone, PartialEq)]
+pub enum TipoDocente {
+    Planta,
+    Ocasional,
+    HoraCatedra,
+    Visitante,
+    Experto,
+}
+
+impl fmt::Display for TipoDocente {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TipoDocente::Planta      => write!(f, "Planta"),
+            TipoDocente::Ocasional   => write!(f, "Ocasional"),
+            TipoDocente::HoraCatedra => write!(f, "Hora Cátedra"),
+            TipoDocente::Visitante   => write!(f, "Visitante"),
+            TipoDocente::Experto     => write!(f, "Experto"),
+        }
+    }
+}
+
+/// Estados del ciclo de vida estudiantil.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EstadoEstudiante {
+    Aspirante,
+    Admitido,
+    Activo,
+    Suspendido,
+    Graduado,
+    Retirado,
+}
+
+// ─── Trait: comportamiento de entidad académica ─────────────────────────────
+
+/// Trait que define el comportamiento común de toda entidad académica.
+/// Equivale a la clase abstracta UnidadAcademica de Java, pero sin herencia.
+pub trait EntidadAcademica {
+    fn nombre(&self) -> &str;
+    fn codigo(&self) -> &str;
+    fn tipo(&self)   -> &str;
+
+    /// Implementación por defecto: descripción resumida de la entidad.
+    fn descripcion(&self) -> String {
+        format!("{} [{}]: {}", self.tipo(), self.codigo(), self.nombre())
+    }
+}
+
+// ─── Structs organizacionales ───────────────────────────────────────────────
+
+/// Facultad universitaria de primer nivel.
+#[derive(Debug, Clone)]
+pub struct Facultad {
+    pub nombre:   String,
+    pub codigo:   String,
+    pub decano:   String,
+    pub escuelas: Vec<Escuela>,
+}
+
+impl EntidadAcademica for Facultad {
+    fn nombre(&self) -> &str { &self.nombre }
+    fn codigo(&self) -> &str { &self.codigo }
+    fn tipo(&self)   -> &str { "Facultad"  }
+}
+
+impl Facultad {
+    pub fn new(nombre: &str, codigo: &str, decano: &str) -> Self {
+        Facultad {
+            nombre:   nombre.to_string(),
+            codigo:   codigo.to_string(),
+            decano:   decano.to_string(),
+            escuelas: Vec::new(),
+        }
+    }
+
+    pub fn agregar_escuela(&mut self, escuela: Escuela) {
+        self.escuelas.push(escuela);
+    }
+
+    pub fn escuelas(&self) -> &[Escuela] {
+        &self.escuelas
+    }
+}
+
+// ─── Escuela ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct Escuela {
+    pub nombre:   String,
+    pub codigo:   String,
+    pub director: String,
+    pub docentes: Vec<Docente>,
+}
+
+impl EntidadAcademica for Escuela {
+    fn nombre(&self) -> &str { &self.nombre }
+    fn codigo(&self) -> &str { &self.codigo }
+    fn tipo(&self)   -> &str { "Escuela"   }
+}
+
+impl Escuela {
+    pub fn new(nombre: &str, codigo: &str, director: &str) -> Self {
+        Escuela {
+            nombre:   nombre.to_string(),
+            codigo:   codigo.to_string(),
+            director: director.to_string(),
+            docentes: Vec::new(),
+        }
+    }
+
+    pub fn agregar_docente(&mut self, d: Docente) {
+        self.docentes.push(d);
+    }
+}
+
+// ─── Centro e Instituto ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct Centro {
+    pub nombre:   String,
+    pub codigo:   String,
+    pub director: String,
+}
+
+impl EntidadAcademica for Centro {
+    fn nombre(&self) -> &str { &self.nombre }
+    fn codigo(&self) -> &str { &self.codigo }
+    fn tipo(&self)   -> &str { "Centro"    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Instituto {
+    pub nombre:   String,
+    pub codigo:   String,
+    pub director: String,
+}
+
+impl EntidadAcademica for Instituto {
+    fn nombre(&self) -> &str { &self.nombre }
+    fn codigo(&self) -> &str { &self.codigo }
+    fn tipo(&self)   -> &str { "Instituto" }
+}
+
+/// Comité Académico Básico de Área.
+#[derive(Debug, Clone)]
+pub struct Caba {
+    pub area_formacion: String,
+    pub coordinador:    String,
+    pub nombre:         String,
+}
+\end{lstlisting}
+
+\subsection{Pattern matching con \texttt{Result} y \texttt{Option}}
+\label{subsec:pattern-matching}
+
+El \textit{pattern matching} de \rust\ constituye su mecanismo más expresivo para
+el manejo de valores que pueden estar ausentes (\texttt{Option<T>}) o ser el resultado
+de operaciones que pueden fallar (\texttt{Result<T, E>}). En lugar de las excepciones
+y los valores nulos de \java, \rust\ hace explícita en el tipo de retorno la posibilidad
+de ausencia o error, constriñendo al llamador a tratar ambos casos en tiempo de compilación.
+
+\begin{lstlisting}[style=rustStyle, caption={Pattern matching con \texttt{Option} y \texttt{Result}}, label={lst:pattern-matching}]
+// ─── Option: búsqueda de estudiante por código ──────────────────────────────
+
+pub struct Estudiante {
+    pub nombre:    String,
+    pub codigo:    String,
+    pub programa:  String,
+    pub semestre:  u8,
+    pub estado:    EstadoEstudiante,
+}
+
+/// Busca un estudiante por código en una lista.
+/// Retorna Option<&Estudiante>: Some si existe, None si no.
+pub fn buscar_estudiante<'a>(
+    estudiantes: &'a [Estudiante],
+    codigo: &str,
+) -> Option<&'a Estudiante> {
+    estudiantes.iter().find(|e| e.codigo == codigo)
+}
+
+fn ejemplo_option() {
+    let estudiantes = vec![
+        Estudiante {
+            nombre:   "Ana Pérez".to_string(),
+            codigo:   "20201015".to_string(),
+            programa: "ISC".to_string(),
+            semestre: 6,
+            estado:   EstadoEstudiante::Activo,
+        },
+    ];
+
+    // Caso 1: estudiante encontrado
+    match buscar_estudiante(&estudiantes, "20201015") {
+        Some(e) => println!("Encontrado: {} — semestre {}", e.nombre, e.semestre),
+        None    => println!("Estudiante no encontrado."),
+    }
+
+    // Caso 2: estudiante no encontrado
+    // El compilador obliga a tratar AMBOS casos.
+    // No es posible ignorar None sin advertencia.
+    let resultado = buscar_estudiante(&estudiantes, "99999999");
+    let nombre = resultado
+        .map(|e| e.nombre.as_str())
+        .unwrap_or("Desconocido");
+    println!("Nombre: {}", nombre);
+}
+
+// ─── Result: validación de matrícula ────────────────────────────────────────
+
+#[derive(Debug)]
+pub enum ErrorMatricula {
+    ProgramaInexistente(String),
+    EstudianteSuspendido,
+    PeriodoFuera,
+}
+
+impl fmt::Display for ErrorMatricula {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ErrorMatricula::ProgramaInexistente(cod) =>
+                write!(f, "Programa '{}' no existe en el sistema.", cod),
+            ErrorMatricula::EstudianteSuspendido =>
+                write!(f, "El estudiante se encuentra suspendido."),
+            ErrorMatricula::PeriodoFuera =>
+                write!(f, "El periodo de matrícula está cerrado."),
+        }
+    }
+}
+
+/// Valida y registra una matrícula. Retorna Result.
+pub fn matricular(
+    estudiante: &Estudiante,
+    programa_codigo: &str,
+    periodo_abierto: bool,
+) -> Result<String, ErrorMatricula> {
+    if !periodo_abierto {
+        return Err(ErrorMatricula::PeriodoFuera);
+    }
+    if estudiante.estado == EstadoEstudiante::Suspendido {
+        return Err(ErrorMatricula::EstudianteSuspendido);
+    }
+    // En un sistema real se consultaría el repositorio de programas
+    if programa_codigo.is_empty() {
+        return Err(ErrorMatricula::ProgramaInexistente(
+            programa_codigo.to_string()));
+    }
+    Ok(format!("Matrícula registrada: {} en {} — periodo activo",
+               estudiante.nombre, programa_codigo))
+}
+
+fn ejemplo_result() {
+    let e = Estudiante {
+        nombre:   "Carlos Gómez".to_string(),
+        codigo:   "20191234".to_string(),
+        programa: "ISC".to_string(),
+        semestre: 4,
+        estado:   EstadoEstudiante::Activo,
+    };
+
+    // El operador ? propaga el error automáticamente
+    match matricular(&e, "ISC-2025", true) {
+        Ok(msg) => println!("{}", msg),
+        Err(err) => println!("Error de matrícula: {}", err),
+    }
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Modelado del dominio completo en \rust}
+\label{sec:rust-dominio}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+La implementación completa del dominio en \rust\ abarca los actores institucionales,
+los programas académicos y el sistema de evaluación. En todos los casos se prioriza
+la seguridad de tipos y la expresividad del sistema de pattern matching frente a la
+herencia de clases que caracteriza la versión en \java.
+
+\subsection{Structs y enums de actores}
+\label{subsec:rust-actores}
+
+\begin{lstlisting}[style=rustStyle, caption={Actores del dominio en \rust}, label={lst:rust-actores}]
+use serde::{Deserialize, Serialize};
+
+// ─── Docente ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Docente {
+    pub nombre:         String,
+    pub identificacion: String,
+    pub correo:         Option<String>,  // puede no tener correo registrado
+    pub tipo:           TipoDocente,
+    pub escuela_codigo: String,
+    pub categoria:      Option<String>,  // sólo para planta
+}
+
+impl Docente {
+    pub fn new(
+        nombre: &str,
+        identificacion: &str,
+        tipo: TipoDocente,
+        escuela_codigo: &str,
+    ) -> Self {
+        Docente {
+            nombre:         nombre.to_string(),
+            identificacion: identificacion.to_string(),
+            correo:         None,
+            tipo,
+            escuela_codigo: escuela_codigo.to_string(),
+            categoria:      None,
+        }
+    }
+
+    pub fn con_correo(mut self, correo: &str) -> Self {
+        self.correo = Some(correo.to_string());
+        self
+    }
+
+    pub fn con_categoria(mut self, categoria: &str) -> Self {
+        self.categoria = Some(categoria.to_string());
+        self
+    }
+
+    /// ¿Es docente de planta? Verificación por pattern matching.
+    pub fn es_planta(&self) -> bool {
+        matches!(self.tipo, TipoDocente::Planta)
+    }
+}
+
+// ─── PersonalAdministrativo ─────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersonalAdministrativo {
+    pub nombre:         String,
+    pub identificacion: String,
+    pub correo:         Option<String>,
+    pub cargo:          String,
+    pub dependencia:    String,
+}
+
+// ─── Egresado ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Egresado {
+    pub nombre:               String,
+    pub identificacion:       String,
+    pub programa_graduacion:  String,
+    pub anio_graduacion:      u16,
+    pub titulo:               String,
+}
+
+// ─── Programa Académico ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum NivelPrograma {
+    Pregrado,
+    Especializacion,
+    Maestria,
+    Doctorado,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgramaAcademico {
+    pub nombre:          String,
+    pub codigo:          String,
+    pub nivel:           NivelPrograma,
+    pub modalidad:       String,
+    pub facultad_codigo: String,
+    pub plan_estudios:   Option<PlanDeEstudios>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanDeEstudios {
+    pub version:          String,
+    pub creditos_totales: u16,
+    pub espacios:         Vec<EspacioAcademico>,
+}
+
+impl PlanDeEstudios {
+    pub fn creditos_acumulados(&self) -> u16 {
+        self.espacios.iter().map(|e| e.creditos).sum()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EspacioAcademico {
+    pub nombre:         String,
+    pub codigo:         String,
+    pub creditos:       u16,
+    pub tipo:           String,
+    pub horas_teoricas: u8,
+    pub horas_practicas: u8,
+}
+
+// ─── Matrícula ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Matricula {
+    pub estudiante_id:   String,
+    pub programa_codigo: String,
+    pub periodo:         String,
+    pub estado:          EstadoEstudiante,
+}
+\end{lstlisting}
+
+\subsection{Clases de evaluación en \rust}
+\label{subsec:rust-evaluacion}
+
+\begin{lstlisting}[style=rustStyle, caption={Sistema de evaluación en \rust}, label={lst:rust-evaluacion}]
+use std::collections::HashMap;
+
+// ─── Resultado de Aprendizaje ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResultadoDeAprendizaje {
+    pub descripcion:     String,
+    pub nivel_dominio:   String,
+    pub programa_codigo: String,
+}
+
+// ─── Rúbrica ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Rubrica {
+    pub nombre:    String,
+    pub criterios: Vec<CriterioRubrica>,
+    pub niveles:   Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CriterioRubrica {
+    pub nombre:       String,
+    pub ponderacion:  f64,
+    pub descriptores: HashMap<String, String>,
+}
+
+impl CriterioRubrica {
+    pub fn nuevo(nombre: &str, ponderacion: f64) -> Result<Self, String> {
+        if !(0.0..=1.0).contains(&ponderacion) {
+            return Err(format!(
+                "Ponderación {ponderacion} fuera de rango [0.0, 1.0]"));
+        }
+        Ok(CriterioRubrica {
+            nombre:       nombre.to_string(),
+            ponderacion,
+            descriptores: HashMap::new(),
+        })
+    }
+}
+
+// ─── Evidencia ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Evidencia {
+    pub tipo:          String,
+    pub descripcion:   String,
+    pub fecha:         String,  // ISO 8601: "2025-11-15"
+    pub calificacion:  f64,     // 0.0 - 5.0
+}
+
+impl Evidencia {
+    pub fn nueva(
+        tipo: &str,
+        descripcion: &str,
+        fecha: &str,
+        calificacion: f64,
+    ) -> Result<Self, String> {
+        if !(0.0..=5.0).contains(&calificacion) {
+            return Err(format!(
+                "Calificación {calificacion} fuera del rango 0.0–5.0."));
+        }
+        Ok(Evidencia {
+            tipo:         tipo.to_string(),
+            descripcion:  descripcion.to_string(),
+            fecha:        fecha.to_string(),
+            calificacion,
+        })
+    }
+
+    pub fn aprueba(&self, umbral: f64) -> bool {
+        self.calificacion >= umbral
+    }
+}
+
+// ─── Trait Evaluable ────────────────────────────────────────────────────────
+
+/// Trait para entidades sujetas a evaluación formativa.
+pub trait Evaluable {
+    fn evaluar(&self, rubrica: &Rubrica) -> Result<f64, String>;
+    fn evidencias(&self) -> &[Evidencia];
+
+    fn aprueba(&self, umbral: f64) -> bool {
+        self.evaluar(&Rubrica {
+            nombre: String::new(),
+            criterios: Vec::new(),
+            niveles: Vec::new(),
+        }).map(|nota| nota >= umbral)
+          .unwrap_or(false)
+    }
+}
+
+// ─── Trait Gestionable ──────────────────────────────────────────────────────
+
+/// Trait para operaciones CRUD sobre entidades del dominio.
+pub trait Gestionable {
+    fn crear(&mut self) -> Result<(), String>;
+    fn actualizar(&mut self) -> Result<(), String>;
+    fn eliminar(&mut self) -> Result<(), String>;
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Concurrencia y seguridad de memoria}
+\label{sec:rust-concurrencia}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+Uno de los aportes más significativos de \rust\ es la garantía en tiempo de compilación
+de la ausencia de condiciones de carrera (\textit{data races}). Este aspecto resulta
+relevante para el sistema estatutario en escenarios como el procesamiento concurrente
+de matrículas durante los periodos de inscripción, cuando múltiples usuarios intentan
+registrar matrícula en el mismo programa simultáneamente.
+
+\begin{lstlisting}[style=rustStyle, caption={caption[Acceso concurrente con Arc y Mutex]{Acceso concurrente con \texttt{Arc$<$Mutex$>$}}}, label={lst:concurrencia}]
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+/// Procesamiento concurrente de matrículas usando Arc<Mutex<Vec<Matricula>>>.
+///
+/// Arc (Atomic Reference Counting) permite compartir ownership entre hilos.
+/// Mutex garantiza acceso exclusivo al vector de matrículas.
+/// El compilador verifica que Matricula implemente Send (puede cruzar hilos).
+fn procesar_matriculas_concurrente(
+    nuevas_matriculas: Vec<Matricula>,
+) -> Vec<Matricula> {
+
+    // Arc<Mutex<>> permite acceso compartido y seguro entre hilos
+    let registro = Arc::new(Mutex::new(Vec::<Matricula>::new()));
+
+    let mut handles = Vec::new();
+
+    for matricula in nuevas_matriculas {
+        // Clonamos el Arc (no el Mutex): solo se copia el puntero de conteo
+        let registro_clone = Arc::clone(&registro);
+
+        let handle = thread::spawn(move || {
+            // lock() retorna MutexGuard que se libera automáticamente
+            // al salir del bloque (RAII)
+            let mut lista = registro_clone.lock().unwrap();
+
+            // Validación simple: evitar matrícula duplicada
+            let ya_existe = lista.iter().any(|m| {
+                m.estudiante_id == matricula.estudiante_id
+                    && m.programa_codigo == matricula.programa_codigo
+                    && m.periodo == matricula.periodo
+            });
+
+            if !ya_existe {
+                println!("[Hilo {:?}] Registrando matrícula: {} en {}",
+                         thread::current().id(),
+                         matricula.estudiante_id,
+                         matricula.programa_codigo);
+                lista.push(matricula);
+            }
+        });
+        handles.push(handle);
+    }
+
+    // Esperar a que todos los hilos terminen
+    for h in handles { h.join().unwrap(); }
+
+    // Extraer el vector del Mutex
+    Arc::try_unwrap(registro)
+        .expect("Aún existen referencias Arc activas")
+        .into_inner()
+        .unwrap()
+}
+\end{lstlisting}
+
+\noindent
+La comparación con \java\ resulta instructiva. En \java, el acceso concurrente a la
+lista de matrículas requeriría \texttt{synchronized} o \texttt{ReentrantLock}, y un
+error de omisión ---olvidar el bloque \texttt{synchronized}--- no es detectado por el
+compilador: el error se manifiesta en tiempo de ejecución, de manera no determinística,
+bajo carga concurrente elevada. En \rust, si el código intenta acceder al
+\texttt{Mutex<>} sin adquirir el \textit{lock}, o intenta compartir un tipo que
+no implementa \texttt{Send} entre hilos, el compilador rechaza el código con un
+error de tipos. La tabla~\ref{tab:java-rust-concurrencia} sintetiza la diferencia.
+
+\begingroup
+\small
+\begin{longtable}{@{} L{3.5cm} L{5cm} L{5.5cm} @{}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Concurrencia en \java\ vs.\ \rust.} \label{tab:java-rust-concurrencia} \\
+	\toprule
+	\textbf{Aspecto} & \textbf{\java} & \textbf{\rust} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Aspecto} & \textbf{\java} & \textbf{\rust} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Mecanismo de acceso exclusivo &
+	\texttt{synchronized}, \texttt{ReentrantLock} &
+	\texttt{Mutex<T>}: el tipo garantiza exclusión por diseño \\
+	\midrule
+	
+	Compartir entre hilos &
+	Cualquier objeto es compartible; los errores se detectan en ejecución &
+	Solo tipos que implementen \texttt{Send}; verificado por el compilador \\
+	\midrule
+	
+	Detección de \textit{data race} &
+	Herramientas externas o revisión manual de código &
+	Compilador: imposible compilar código con \textit{data race} (\textit{Safety}) \\
+	\midrule
+	
+	Compartir propiedad &
+	Implícito por referencia (punteros gestionados por GC) &
+	\texttt{Arc<T>}: conteo de referencias atómico y explícito \\
+	\midrule
+	
+	Costo en ejecución &
+	Impacto del GC + overhead de sincronización dinámica &
+	Solo el costo mínimo del \texttt{Mutex}, sin pausas de GC \\
+\end{longtable}
+\endgroup
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Interfaz gráfica en \rust}
+\label{sec:rust-gui}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+El ecosistema de interfaces gráficas en \rust\ es más fragmentado que el de \java.
+La biblioteca \texttt{eframe}/\texttt{egui} se destaca por su enfoque de interfaz
+inmediata (\textit{immediate mode GUI}), simplicidad de instalación como crate y
+capacidad de compilación tanto para escritorio como para WebAssembly. Su modelo de
+programación difiere radicalmente de JavaFX: en lugar de definir un árbol de componentes
+que persiste entre frames, la interfaz se redibuja completa en cada frame,
+y su estado reside en el struct de la aplicación.
+
+\begin{lstlisting}[style=rustStyle, caption={Interfaz gráfica básica con \texttt{eframe}/\texttt{egui}}, label={lst:egui}]
+// Cargo.toml (dependencias relevantes):
+// [dependencies]
+// eframe = "0.27"
+// egui   = "0.27"
+
+use eframe::egui;
+
+/// Estado de la aplicación (persiste entre frames).
+struct AppEstatutario {
+    facultades:      Vec<Facultad>,
+    facultad_nueva:  String,
+    codigo_nuevo:    String,
+    decano_nuevo:    String,
+    mensaje_estado:  String,
+}
+
+impl AppEstatutario {
+    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        AppEstatutario {
+            facultades:     Vec::new(),
+            facultad_nueva: String::new(),
+            codigo_nuevo:   String::new(),
+            decano_nuevo:   String::new(),
+            mensaje_estado: String::new(),
+        }
+    }
+}
+
+impl eframe::App for AppEstatutario {
+
+    /// Se invoca en cada frame; redefine la interfaz completa.
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
+            ui.heading("Sistema de Información Estatutario — Universidad Distrital");
+        });
+
+        egui::SidePanel::left("panel_formulario").show(ctx, |ui| {
+            ui.label("Nueva Facultad");
+            ui.horizontal(|ui| {
+                ui.label("Código:");
+                ui.text_edit_singleline(&mut self.codigo_nuevo);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Nombre:");
+                ui.text_edit_singleline(&mut self.facultad_nueva);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Decano/a:");
+                ui.text_edit_singleline(&mut self.decano_nuevo);
+            });
+            if ui.button("Agregar").clicked() {
+                if !self.codigo_nuevo.is_empty() && !self.facultad_nueva.is_empty() {
+                    self.facultades.push(Facultad::new(
+                        &self.facultad_nueva,
+                        &self.codigo_nuevo,
+                        &self.decano_nuevo,
+                    ));
+                    self.mensaje_estado = format!(
+                        "Facultad '{}' agregada.", self.facultad_nueva);
+                    self.facultad_nueva.clear();
+                    self.codigo_nuevo.clear();
+                    self.decano_nuevo.clear();
+                } else {
+                    self.mensaje_estado =
+                        "Complete código y nombre.".to_string();
+                }
+            }
+            ui.label(&self.mensaje_estado);
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Facultades registradas");
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                for facultad in &self.facultades {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("[{}]", facultad.codigo));
+                        ui.label(&facultad.nombre);
+                        ui.label(format!("— Decano/a: {}", facultad.decano));
+                    });
+                    ui.separator();
+                }
+            });
+        });
+    }
+}
+
+fn main() -> Result<(), eframe::Error> {
+    let opciones = eframe::NativeOptions::default();
+    eframe::run_native(
+        "Sistema Estatutario UD",
+        opciones,
+        Box::new(|cc| Box::new(AppEstatutario::new(cc))),
+    )
+}
+\end{lstlisting}
+
+\noindent
+El modelo de interfaz inmediata de \texttt{egui} resulta sorprendente para quienes
+provienen de JavaFX o cualquier \textit{framework} basado en árbol de componentes
+persistente. No existen \textit{listeners} de eventos ni \textit{callbacks} explícitos:
+el método \texttt{update} examina el estado de la interfaz en cada frame y actualiza
+el estado de la aplicación en consecuencia. Este modelo simplifica el razonamiento
+sobre el estado de la interfaz, toda vez que el estado completo reside en un único
+struct que el método \texttt{update} puede leer y modificar sin ambigüedad.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Persistencia en \rust}
+\label{sec:rust-persistencia}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+La serialización y deserialización en \rust\ se implementa mediante las crates
+\texttt{serde} y \texttt{serde\_json}. La integración es especialmente fluida gracias
+a la macro \texttt{\#[derive(Serialize, Deserialize)]}, que genera automáticamente
+el código de serialización para cualquier struct o enum anotado, sin requerir
+escritura manual de conversores ni configuración adicional.
+
+\begin{lstlisting}[style=rustStyle, caption={Persistencia con \texttt{serde} y \texttt{serde\_json}}, label={lst:serde}]
+// Cargo.toml:
+// [dependencies]
+// serde      = { version = "1", features = ["derive"] }
+// serde_json = "1"
+
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
+
+// Los derives Serialize y Deserialize se heredan en todos los campos
+// siempre que estos también los implementen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Facultad {
+    pub nombre:   String,
+    pub codigo:   String,
+    pub decano:   String,
+    pub escuelas: Vec<Escuela>,
+}
+
+// ─── Funciones de persistencia ───────────────────────────────────────────────
+
+/// Guarda una lista de Facultades en un archivo JSON.
+///
+/// # Errors
+/// Retorna Err si no se puede escribir el archivo.
+pub fn guardar_facultades(
+    facultades: &[Facultad],
+    ruta: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let json = serde_json::to_string_pretty(facultades)?;
+    // Crear directorios intermedios si no existen
+    if let Some(parent) = Path::new(ruta).parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(ruta, json)?;
+    println!("Facultades guardadas en '{}'.", ruta);
+    Ok(())
+}
+
+/// Carga la lista de Facultades desde un archivo JSON.
+///
+/// Si el archivo no existe, retorna una lista vacía sin error.
+///
+/// # Errors
+/// Retorna Err si el archivo existe pero no puede ser deserializado.
+pub fn cargar_facultades(
+    ruta: &str,
+) -> Result<Vec<Facultad>, Box<dyn std::error::Error>> {
+    if !Path::new(ruta).exists() {
+        return Ok(Vec::new());
+    }
+    let json = fs::read_to_string(ruta)?;
+    let facultades: Vec<Facultad> = serde_json::from_str(&json)?;
+    Ok(facultades)
+}
+
+/// Guarda cualquier tipo serializable en JSON (función genérica).
+pub fn guardar_json<T: Serialize>(
+    datos: &T,
+    ruta: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let json = serde_json::to_string_pretty(datos)?;
+    if let Some(parent) = Path::new(ruta).parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(ruta, json)?;
+    Ok(())
+}
+
+/// Carga cualquier tipo deserializable desde JSON (función genérica).
+pub fn cargar_json<T: for<'de> Deserialize<'de>>(
+    ruta: &str,
+) -> Result<Option<T>, Box<dyn std::error::Error>> {
+    if !Path::new(ruta).exists() {
+        return Ok(None);
+    }
+    let json = fs::read_to_string(ruta)?;
+    let valor: T = serde_json::from_str(&json)?;
+    Ok(Some(valor))
+}
+
+// ─── Ejemplo de uso ──────────────────────────────────────────────────────────
+
+fn ejemplo_persistencia() -> Result<(), Box<dyn std::error::Error>> {
+    let mut fac = Facultad {
+        nombre:   "Facultad de Ingeniería".to_string(),
+        codigo:   "FI".to_string(),
+        decano:   "Dr. Ejemplo".to_string(),
+        escuelas: Vec::new(),
+    };
+
+    let facultades = vec![fac];
+    guardar_facultades(&facultades, "datos/facultades.json")?;
+
+    let cargadas = cargar_facultades("datos/facultades.json")?;
+    println!("Facultades cargadas: {}", cargadas.len());
+    for f in &cargadas {
+        println!("  - {} ({})", f.nombre, f.codigo);
+    }
+    Ok(())
+}
+\end{lstlisting}
+
+\noindent
+La comparación con la persistencia en \java\ (Gson) revela una diferencia conceptual
+significativa. En \java, Gson opera mediante reflexión en tiempo de ejecución: analiza
+los campos del objeto en tiempo de ejecución y los serializa dinámicamente. Este enfoque
+es flexible pero conlleva un costo: los errores de tipo (por ejemplo, intentar deserializar
+un campo \texttt{int} desde un valor JSON de tipo \texttt{string}) se detectan en ejecución,
+no en compilación. En \rust, el código de serialización se genera en tiempo de compilación
+mediante macros procedurales: los errores de tipo son detectados antes de que el programa
+se ejecute, y el rendimiento es superior al no requerir reflexión.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{\java\ versus \rust: análisis comparativo ampliado}
+\label{sec:rust-java-comparacion}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+La implementación del mismo dominio en ambos lenguajes permite una comparación
+fundamentada en evidencia concreta, en lugar de los debates abstractos que suelen
+dominar las discusiones sobre lenguajes de programación. La tabla~\ref{tab:comparacion-8d}
+examina ocho dimensiones relevantes para el sistema estatutario.
+
+\begin{longtable}{@{}L{2.5cm}L{5cm}L{5cm}@{}}
+\caption{Comparación de java y rust en ocho dimensiones}
+\label{tab:comparacion-8d}\\
+\toprule
+\textbf{Dimensión} & \textbf{\java} & \textbf{\rust} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{l}{\small\textit{Continuación de la tabla~\ref{tab:comparacion-8d}}}\\
+\toprule
+\textbf{Dimensión} & \textbf{\java} & \textbf{\rust} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Herencia &
+  Herencia simple de clases (\texttt{extends}); herencia múltiple solo de interfaces.
+  Jerarquía \texttt{UnidadAcademica $\leftarrow$ Facultad} &
+  No existe herencia de structs. Composición de traits: \texttt{impl EntidadAcademica for Facultad}.
+  La composición reemplaza la herencia \\
+\addlinespace
+Traits vs.\ interfaces &
+  Las interfaces definen contratos de comportamiento. Las clases abstractas pueden
+  incluir estado. \texttt{default} methods desde Java~8 &
+  Los traits definen comportamiento y pueden tener implementaciones por defecto.
+  No tienen estado propio. Un struct puede implementar múltiples traits \\
+\addlinespace
+Null safety &
+  \texttt{null} es un valor legal para cualquier referencia de objeto.
+  \texttt{NullPointerException} es el error más frecuente en producción.
+  Mitigación: \texttt{Optional\textless T\textgreater} (no obligatoria) &
+  \texttt{null} no existe. Los valores ausentes se expresan como \texttt{Option\textless T\textgreater}.
+  El compilador obliga a tratar \texttt{Some} y \texttt{None}.
+  Imposible el \textit{null dereference} \\
+\addlinespace
+Manejo de errores &
+  Excepciones checked y unchecked. La jerarquía \texttt{EstatutoException}
+  obliga a declarar y capturar. Riesgo de excepciones no controladas (unchecked) &
+  \texttt{Result\textless T, E\textgreater}: el tipo de retorno anuncia explícitamente el posible error.
+  El operador \texttt{?} propaga el error. No existen excepciones no controladas \\
+\addlinespace
+Memoria &
+  Recolector de basura (G1GC, ZGC). El programador no gestiona memoria.
+  Posibles pausas GC de 1--100 ms en cargas altas &
+  Ownership + borrowing. Sin GC. Garantías en tiempo de compilación.
+  Rendimiento predecible y sin pausas involuntarias \\
+\addlinespace
+Concurrencia &
+  \texttt{synchronized}, \texttt{Lock}, \texttt{ExecutorService}.
+  Las condiciones de carrera se detectan en ejecución (ThreadSanitizer).
+  El compilador no garantiza ausencia de \textit{data races} &
+  \texttt{Arc\textless Mutex\textless T\textgreater\textgreater}. El sistema de tipos (traits \texttt{Send}/\texttt{Sync})
+  garantiza en compilación la ausencia de \textit{data races}.
+  Error de concurrencia = error de compilación \\
+\addlinespace
+Rendimiento &
+  JIT: rendimiento excelente tras la fase de calentamiento (warm-up).
+  GC introduce latencia variable. Overhead de la JVM en arranque &
+  Compilación AOT a código nativo. Rendimiento comparable a C/C++.
+  Arranque instantáneo. Sin overhead de VM \\
+\addlinespace
+Ecosistema &
+  Ecosistema maduro: Maven Central, Spring, Hibernate, JUnit.
+  Documentación exhaustiva. Comunidad masiva &
+  Ecosistema en crecimiento acelerado: crates.io, tokio, serde, egui.
+  Curva de aprendizaje pronunciada. Comunidad técnica de alta calidad \\
+\end{longtable}
+
+\noindent
+Ninguno de los dos lenguajes es superior en términos absolutos. La elección entre
+\java\ y \rust\ depende del contexto: un sistema de información universitaria de
+gestión académica, con carga moderada y prioridad en la velocidad de desarrollo,
+puede estar mejor servido por \java\ y su ecosistema maduro. Un componente de
+procesamiento de matrículas en tiempo real, con requisitos estrictos de latencia y
+garantías de seguridad de memoria, se beneficiaría de \rust. El presente libro no
+propone una respuesta única; propone, en cambio, que el estudiante adquiera
+suficiente conocimiento de ambos paradigmas para razonar sobre esa elección con
+criterio fundamentado.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Sprints 8 y 9: implementación en \rust}
+\label{sec:sprints-8-9}
+\addcontentsline{toc}{section}{Sprints 8 y 9: implementación en \rust}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\begin{tcolorbox}[sprintBox, title={Sprint 8 — Modelado del dominio en \rust}]
+\textbf{Duración:} 2 semanas\\[4pt]
+\textbf{Objetivo:} Implementar el modelo del dominio completo en \rust,
+con gestión de errores mediante \texttt{Result}/\texttt{Option} y
+serialización con \texttt{serde}.
+
+\vspace{6pt}
+\begin{tabularx}{\linewidth}{@{}L{4cm}L{4cm}L{4.5cm}@{}}
+\toprule
+\textbf{Entregable técnico} & \textbf{Característica del programa} & \textbf{Criterio de la rúbrica} \\
+\midrule
+Módulo \texttt{modelo} con todos los structs y enums del dominio &
+  Structs: Facultad, Escuela, Centro, Instituto, Docente, Estudiante, ProgramaAcademico &
+  Código compila sin advertencias (\texttt{cargo build}); structs derivados de \texttt{Debug}, \texttt{Clone}, \texttt{Serialize}, \texttt{Deserialize} \\
+\addlinespace
+Trait \texttt{EntidadAcademica} implementado para Facultad, Escuela, Centro e Instituto &
+  Polimorfismo mediante traits; despacho estático y dinámico &
+  El trait está correctamente implementado para cada struct; se demuestra uso con \texttt{dyn EntidadAcademica} \\
+\addlinespace
+Funciones de persistencia \texttt{guardar\_json} y \texttt{cargar\_json} &
+  Serialización con \texttt{serde\_json}; archivos en \texttt{datos/} &
+  Los datos se persisten correctamente y se recuperan tras reiniciar \\
+\addlinespace
+Suite de tests (\texttt{\#[cfg(test)]}) con cobertura de casos límite &
+  Manejo de errores con \texttt{Result} y \texttt{Option} &
+  Todos los tests pasan con \texttt{cargo test}; se prueban casos \texttt{Some}, \texttt{None}, \texttt{Ok}, \texttt{Err} \\
+\bottomrule
+\end{tabularx}
+
+\vspace{8pt}
+\textbf{Definición de terminado:} \texttt{cargo build} y \texttt{cargo test} pasan sin
+errores ni advertencias; la serialización de una Facultad con al menos una Escuela y
+un Docente produce un archivo JSON válido que puede ser recargado correctamente.
+\end{tcolorbox}
+
+\vspace{10pt}
+
+\begin{tcolorbox}[actividadIA, title={Actividad IA — Sprint 8: Ownership y el asistente generativo}]
+\textbf{Contexto:} El sistema de ownership de \rust\ es el concepto que más
+dificultad genera en estudiantes provenientes de \java\ o Python. Se propone
+usar el asistente generativo como interlocutor para aclarar dudas de compilación,
+no como generador de soluciones completas.
+
+\vspace{6pt}
+\textbf{Tarea:}
+\begin{enumerate}
+  \item Escribir el siguiente código deliberadamente erróneo y registrar el
+  mensaje de error del compilador:
+\begin{lstlisting}[style=rustStyle, numbers=none]
+let escuela = Escuela::new("EIS", "EIS-001", "Director");
+let ref1 = &escuela;
+let ref2 = &mut escuela; // ERROR: no se puede tomar
+                          // referencia mutable mientras
+                          // existe una inmutable
+println!("{}", ref1.nombre);
+\end{lstlisting}
+  \item Pegar el mensaje de error en el asistente generativo y pedirle que lo explique.
+  \item Contrastar la explicación del asistente con la sección~\ref{subsec:ownership}.
+  \item Identificar si el asistente omitió algún aspecto relevante del modelo de borrowing.
+\end{enumerate}
+
+\vspace{6pt}
+\textbf{Reflexión:} El compilador de \rust\ genera mensajes de error entre los más
+descriptivos y pedagógicos de cualquier lenguaje de programación. Con frecuencia,
+el mensaje no solo identifica el error sino que propone la corrección. ¿En qué
+medida el asistente generativo añade valor respecto del mensaje del propio compilador?
+\end{tcolorbox}
+
+\vspace{10pt}
+%\begin{comment}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 9 — Concurrencia, GUI y comparación Java vs.\ Rust}]
+	\textbf{Duración:} 2 semanas\\[4pt]
+	\textbf{Objetivo:} Implementar procesamiento concurrente de matrículas, una interfaz
+	gráfica básica con \texttt{egui} y elaborar el informe comparativo final Java vs.\ Rust.
+	
+	\vspace{6pt}
+	
+	\noindent
+	\begin{center}
+		\begin{tabular}{p{4cm}p{4cm}p{4.5cm}}
+			\toprule
+			\textbf{Entregable técnico} & \textbf{Característica del programa} & \textbf{Criterio de la rúbrica} \\
+			\midrule
+			Función \verb|procesar_matriculas_concurrente| con \verb|Arc<Mutex<Matricula>>| &
+			Concurrencia segura; evita duplicados en acceso paralelo &
+			El código compila sin \verb|unsafe|; se demuestran al menos 4 hilos concurrentes sin \textit{data race} \\
+			\addlinespace
+			Interfaz gráfica con \texttt{egui}: lista de Facultades y formulario de creación &
+			Interfaz inmediata; estado en \texttt{struct} de aplicación &
+			La aplicación muestra la lista de facultades persistidas y permite agregar nuevas \\
+			\addlinespace
+			Informe comparativo Java vs.\ Rust (5 páginas) &
+			Análisis fundamentado en la implementación realizada &
+			El informe cita evidencia concreta del código propio (no genérico); usa la tabla de 8 dimensiones como estructura \\
+			\addlinespace
+			Reflexión individual: ownership vs.\ GC (1 página) &
+			Perspectiva personal sobre la diferencia de modelo mental &
+			La reflexión es específica: hace referencia a al menos un error de ownership que el estudiante cometió y corrigió \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	\vspace{8pt}
+	\textbf{Definición de terminado:} \verb|cargo run| abre la ventana de \texttt{egui};
+	el test de concurrencia procesa 20 matrículas en paralelo y el resultado no contiene
+	duplicados; el informe comparativo supera la revisión de pares del equipo.
+\end{tcolorbox}
+
+%\end{comment}
+
+\vspace{10pt}
+
+\begin{tcolorbox}[actividadIA, title={Actividad IA — Sprint 9: Comparación asistida \java\ vs.\ \rust}]
+\textbf{Tarea:}
+\begin{enumerate}
+  \item Solicitar al asistente generativo: \textit{``Compara el manejo de
+  concurrencia en Java y Rust para el caso específico de procesamiento paralelo
+  de matrículas universitarias. Enfócate en las garantías de seguridad que
+  ofrece cada lenguaje y en los mecanismos de sincronización disponibles.''}
+  \item Contrastar la respuesta del asistente con la tabla~\ref{tab:java-rust-concurrencia}
+  y el código de los listados~\ref{lst:concurrencia}.
+  \item Identificar afirmaciones del asistente que no se verifican en la
+  implementación concreta realizada en los sprints 6--9.
+  \item Calcular el porcentaje de afirmaciones del asistente que son
+  correctas, parcialmente correctas y erróneas, documentando la metodología.
+\end{enumerate}
+
+\vspace{6pt}
+\textbf{Punto de reflexión metodológica:} La evaluación crítica de la calidad
+de una respuesta generada por IA requiere conocimiento previo del dominio.
+Un estudiante que no ha implementado concurrencia en ambos lenguajes no puede
+evaluar si la respuesta del asistente es correcta. Esto no invalida el uso
+de asistentes generativos; redefine su lugar en el proceso de aprendizaje:
+son más útiles para el experto que para el principiante, aun cuando el
+principiante sea quien más los use.
+\end{tcolorbox}

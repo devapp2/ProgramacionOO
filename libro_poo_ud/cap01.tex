@@ -1,0 +1,1213 @@
+%% ============================================================
+%% cap01.tex — Capítulo 1
+%% Fundamentos de POO y contexto institucional
+%% ============================================================
+
+\chapter{Fundamentos de \poo\ y contexto institucional}
+\label{cap:fundamentos}
+
+\noindent
+El presente capítulo sitúa la \poo\ en el conjunto más amplio de los
+paradigmas de programación y establece el marco institucional dentro
+del cual se desarrollará el caso de estudio a lo largo de las doce
+iteraciones del libro: el sistema de información para el Estatuto General
+(\acuerdo) y el Estatuto Académico de la \ud.
+Puesto que el dominio del problema determina en buena medida las
+decisiones de diseño orientado a objetos, se considera indispensable
+que el estudiante comprenda el entramado operativo de la institución
+antes de escribir la primera línea de código.
+La experiencia docente confirmaa que el estudiante asimila con mayor
+profundidad los conceptos de encapsulamiento y herencia cuando los aplica
+sobre un dominio que le resulta familiar, habida cuenta de que la universidad
+no es un sistema bancario de manual: es su propio entorno cotidiano,
+con reglas, actores y tensiones que él mismo ha experimentado.
+%% ─────────────────────────────────────────────
+\section{Paradigmas de programación y el enfoque orientado a objetos}
+\label{sec:paradigmas}
+%% ─────────────────────────────────────────────
+
+Cuatro paradigmas principales han dominado la historia de la programación
+desde los años sesenta: el imperativo, el funcional, el lógico y el orientado
+a objetos. La Tabla~\ref{tab:paradigmas} los contrasta en las dimensiones
+que resultan más pertinentes para la discusión que se desarrollará a lo
+largo del libro.
+
+\begingroup
+\small
+\begin{longtable}{L{2.2cm} L{2.5cm} L{2.8cm} L{3cm} L{2.8cm}}
+	% --- Configuración de encabezados y pies ---
+	\caption{Comparación de los cuatro paradigmas de programación principales. Fuente: elaboración del autor con base en \textcite{Sommerville2015} y \textcite{Pressman2014}.} \label{tab:paradigmas} \\
+	\toprule
+	\textbf{Paradigma} & \textbf{Abstracción principal} & \textbf{Lenguajes representativos} & \textbf{Fortalezas} & \textbf{Limitaciones} \\
+	\midrule
+	\endfirsthead
+	
+	\multicolumn{5}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Paradigma} & \textbf{Abstracción principal} & \textbf{Lenguajes representativos} & \textbf{Fortalezas} & \textbf{Limitaciones} \\
+	\midrule
+	\endhead
+	
+	\midrule
+	\multicolumn{5}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Imperativo / Procedimental
+	& Instrucción secuencial y procedimiento
+	& C, Pascal, COBOL, Fortran
+	& Cercano al hardware; eficiencia de ejecución; amplio soporte de herramientas
+	& Escalabilidad limitada; acoplamiento entre datos y lógica; dificultad de mantenimiento en sistemas grandes \\
+	\midrule
+	
+	Funcional
+	& Función matemática pura; composición; inmutabilidad
+	& Haskell, Erlang, Clojure, Scala, F\#
+	& Razonamiento formal facilitado; ausencia de efectos secundarios; concurrencia natural
+	& Curva de aprendizaje pronunciada; rendimiento en operaciones con estado mutable; ecosistema más reducido en dominios empresariales \\
+	\midrule
+	
+	Lógico
+	& Predicado, regla y unificación
+	& Prolog, Datalog, Answer Set Programming
+	& Expresividad en dominios de conocimiento; búsqueda automática de soluciones; adecuado para sistemas expertos
+	& Rendimiento impredecible; dificultad para modelar efectos secundarios; ecosistema académico más que industrial \\
+	\midrule
+	
+	Orientado a objetos
+	& Clase, objeto, mensaje
+	& Java, C++, Python, C\#, Kotlin, \textit{Rust} (parcial)
+	& Modelado natural de dominios complejos; reutilización por herencia y composición; encapsulamiento del estado; patrones de diseño maduros
+	& Herencia mal empleada genera acoplamiento fuerte; sobrecarga conceptual inicial; dificultad en sistemas altamente concurrentes sin cuidado explícito \\
+\end{longtable}
+\endgroup
+
+\subsection*{Los cuatro pilares del paradigma orientado a objetos}
+
+El paradigma orientado a objetos (-POO-) descansa sobre cuatro principios cuya
+comprensión es condición necesaria ---aunque no suficiente--- para diseñar
+sistemas mantenibles.\footnote{%
+  \textcite{Gamma1994} advierten que la herencia es con frecuencia
+  sobreempleada por programadores novatos. La recomendación del libro
+  es preferir la composición sobre la herencia (\textit{favor composition over
+  inheritance}), salvo cuando la relación «es un» sea verdaderamente estable
+  en el dominio. En el dominio de la \ud, la relación entre \texttt{Docente}
+  y \texttt{Persona} parece estable; la relación entre
+  \texttt{DirectorDeEscuela} y \texttt{Docente} podría modelarse mejor
+  como un rol.}
+
+\textbf{Encapsulamiento.} Los datos internos de un objeto quedan ocultos
+al exterior. Solo se expone lo necesario mediante una interfaz pública.
+En el dominio de la \ud, la clase \texttt{Facultad} encapsula su lista
+de escuelas adscritas; ningún otro objeto puede modificarla directamente,
+sino solo a través de métodos definidos en la propia clase.
+Así, los invariantes del dominio ---como el requisito de que una Escuela
+no puede pertenecer simultáneamente a dos Facultades--- se preservan
+mediante el encapsulamiento.
+
+\textbf{Herencia.} Una clase puede derivarse de otra, heredando sus atributos
+y comportamientos mientras añade o sobreescribe los que le son propios.
+La clase abstracta \texttt{UnidadAcademica} reúne los atributos comunes
+a Facultad, Escuela, Centro e Instituto ---nombre, código, fecha de creación,
+director---; cada subclase agrega los atributos y comportamientos específicos
+que la distinguen.
+
+\textbf{Polimorfismo.} Un mismo mensaje puede producir comportamientos distintos
+según el tipo del objeto receptor. El método \texttt{getTipo()} devuelve
+\texttt{"Facultad"} cuando se invoca sobre un objeto de la clase
+\texttt{Facultad} y \texttt{"Escuela"} cuando se invoca sobre un objeto
+de la clase \texttt{Escuela}: una sola llamada, comportamientos disímiles.
+La utilidad resulta evidente cuando el sistema debe generar reportes de
+composición institucional sin conocer de antemano el tipo concreto de cada
+unidad académica.
+
+\textbf{Abstracción.} Consiste en identificar las características esenciales
+de un objeto del dominio y descartar los detalles irrelevantes para el
+propósito del sistema. El modelado de \texttt{Docente} en el sistema de
+información no requiere su fecha de nacimiento ni su estado civil: requiere
+su tipo de vinculación, su Escuela de adscripción y los espacios académicos
+que orienta. La abstracción es, en este sentido, una decisión de diseño
+contextualizada, no una operación algorítmica mecánica.
+
+\subsection*{Pseudocódigo comparativo: paradigma imperativo vs.\ orientado a objetos}
+
+El siguiente par de fragmentos ilustra la diferencia entre abordar el
+problema de ``registrar un docente en el sistema'' desde el paradigma
+imperativo y desde el paradigma orientado a objetos.
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Paradigma imperativo: registrar docente mediante procedimiento y
+    arreglo global.},
+  label={lst:imperativo-docente}]
+// Paradigma imperativo (pseudocódigo en Java-like)
+String[] nombres = new String[100];
+String[] vinculaciones = new String[100];
+String[] escuelas = new String[100];
+int totalDocentes = 0;
+
+void registrarDocente(String nombre,
+                      String vinculacion,
+                      String escuela) {
+    nombres[totalDocentes] = nombre;
+    vinculaciones[totalDocentes] = vinculacion;
+    escuelas[totalDocentes] = escuela;
+    totalDocentes++;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Paradigma orientado a objetos: registrar docente encapsulando
+    estado y comportamiento en la clase \texttt{Escuela}.},
+  label={lst:oo-docente}]
+// Paradigma orientado a objetos
+public class Docente {
+    private String nombre;
+    private TipoDocente vinculacion;
+    private Escuela escuelaAdscrita;
+
+    public Docente(String nombre,
+                   TipoDocente vinculacion,
+                   Escuela escuelaAdscrita) {
+        this.nombre = nombre;
+        this.vinculacion = vinculacion;
+        this.escuelaAdscrita = escuelaAdscrita;
+    }
+
+    public TipoDocente getVinculacion() {
+        return vinculacion;
+    }
+}
+
+public class Escuela extends UnidadAcademica {
+    private List<Docente> docentesAdscritos = new ArrayList<>();
+
+    public void adscribirDocente(Docente d) {
+        docentesAdscritos.add(d);
+    }
+}
+\end{lstlisting}
+
+La diferencia no es solo sintáctica. El fragmento imperativo distribuye los
+datos del docente en tres arreglos paralelos, sin ninguna garantía de
+consistencia: nada impide que \texttt{totalDocentes} supere el tamaño del
+arreglo, ni que una modificación en uno de los arreglos no se refleje en
+los demás. El fragmento orientado a objetos agrupa datos y comportamiento;
+la invariante ``un docente pertenece exactamente a una Escuela'' queda
+expresada directamente en el constructor.
+No es trivial.
+
+%% ─────────────────────────────────────────────
+\section{La Universidad Distrital: estructura académico-administrativa
+  según el \acuerdo}
+\label{sec:estructura-ud}
+%% ─────────────────────────────────────────────
+
+El \acuerdo\ del Consejo Superior Universitario redefinió la organización
+académico-administrativa de la institución con un nivel de detalle normativo
+que, desde la perspectiva del modelado orientado a objetos, resulta
+extraordinariamente valioso: cada artículo del estatuto aporta restricciones
+de dominio que se traducen directamente en invariantes de clase, precondiciones
+de método y relaciones de asociación o composición.
+
+\subsection{Facultades, escuelas, centros, institutos y CABAS}
+\label{subsec:unidades-academicas}
+
+La Tabla~\ref{tab:unidades-academicas} describe las unidades académico-administrativas
+definidas en el \acuerdo, con referencia explícita a los artículos pertinentes.
+
+\begingroup
+\small
+\begin{longtable}{L{2cm} L{4.5cm} C{1.6cm} L{4cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Unidades académico-administrativas de la \ud\ según el \acuerdo.} \label{tab:unidades-academicas} \\
+	\toprule
+	\textbf{Entidad} & \textbf{Definición según el estatuto} & \textbf{Nivel\newline jerárquico} & \textbf{Artículo del \acuerdo} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{4}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Entidad} & \textbf{Definición según el estatuto} & \textbf{Nivel\newline jerárquico} & \textbf{Artículo del \acuerdo} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{4}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Facultad
+	& Unidad académico-administrativa de primer nivel; agrupa Escuelas, Centros, Institutos y CABAS; cuenta con Consejo de Facultad y Decanatura
+	& 1°
+	& Arts.\ 14, 18 \\
+	\midrule
+	
+	Escuela
+	& Unidad de adscripción de los docentes; responsable de la organización, gestión y evaluación curricular; cuenta con Consejo de Escuela y Dirección de Escuela
+	& 2°
+	& Arts.\ 15, 18 \\
+	\midrule
+	
+	Centro
+	& Unidad con consejo y dirección propios; orientada a funciones específicas de investigación, extensión o apoyo
+	& 2°
+	& Art.\ 16 \\
+	\midrule
+	
+	Instituto
+	& Unidad con consejo y dirección propios; puede articular docencia, investigación y extensión en un área disciplinar particular
+	& 2°
+	& Art.\ 17 \\
+	\midrule
+	
+	CABA\newline (Comité Académico Básico de Área)
+	& Comité que articula docencia e investigación dentro de un área de formación; no constituye una unidad autónoma sino un mecanismo de coordinación curricular
+	& 3° (coordinación)
+	& Art.\ 19 \\
+\end{longtable}
+\endgroup
+
+Tres aspectos merecen atención desde la perspectiva del modelado.
+Primero: la Escuela no ofrece programas académicos de manera directa
+---esa responsabilidad recae en las Áreas de Formación y en los propios
+programas---, pero sí adscribe a todos los docentes que participan en
+dichos programas. Esta asimetría genera, en el diagrama de clases, una
+relación de asociación entre \texttt{Escuela} y \texttt{Docente} que
+no coincide con la relación de composición entre \texttt{Facultad} y
+\texttt{ProgramaAcademico}. Segundo: los Centros e Institutos tienen
+consejo y dirección propios, lo cual sugiere que comparten estructura
+de gobierno con las Facultades, aunque ocupen un nivel jerárquico diferente.
+El patrón de diseño \textit{Composite} podría modelar esta recursividad,
+según se discutirá en el Capítulo~\ref{cap:uml}. Tercero ---y esto queda
+abierto como pregunta de diseño---: ¿debe el CABA modelarse como una clase
+o como una relación de asociación entre \texttt{Escuela} y
+\texttt{AreaDeFormacion}?
+
+\subsection{Comunidad universitaria: docentes, estudiantes,
+  personal administrativo, egresados}
+\label{subsec:comunidad-universitaria}
+
+El Artículo 8 del \acuerdo\ define la comunidad universitaria e identifica
+sus componentes. La Tabla~\ref{tab:comunidad} los detalla con sus tipos
+de vinculación.
+
+\begingroup
+\small
+\begin{longtable}{L{2.8cm} L{4cm} L{5.5cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Miembros de la comunidad universitaria según el Art.\ 8 del \acuerdo.} \label{tab:comunidad} \\
+	\toprule
+	\textbf{Miembro} & \textbf{Tipo de vinculación} & \textbf{Características relevantes para el modelado} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Miembro} & \textbf{Tipo de vinculación} & \textbf{Características relevantes para el modelado} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Docente de planta
+	& Empleado público de carrera docente
+	& Vinculación estable; con derechos de escalafón; adscrito a una Escuela \\
+	\midrule
+	
+	Docente ocasional
+	& Contrato de prestación de servicios especiales
+	& Vinculación temporal; con derechos reducidos; adscrito a una Escuela \\
+	\midrule
+	
+	Docente hora cátedra
+	& Contrato de prestación de servicios por hora
+	& Vinculación por período académico; sin continuidad garantizada \\
+	\midrule
+	
+	Docente visitante
+	& Invitado de otra institución; vinculación temporal
+	& Puede no estar adscrito a una Escuela de manera formal \\
+	\midrule
+	
+	Docente experto
+	& Profesional con experiencia certificada; sin grado académico requerido
+	& Vinculación especial en áreas técnico-profesionales \\
+	\midrule
+	
+	Estudiante de pregrado
+	& Matrícula vigente en programa de pregrado
+	& Identificado por código de matrícula; asociado a un Programa \\
+	\midrule
+	
+	Estudiante de posgrado
+	& Matrícula vigente en programa de posgrado
+	& Puede simultanear con vinculación como auxiliar de investigación \\
+	\midrule
+	
+	Personal administrativo
+	& Empleado público o trabajador oficial
+	& Rol de soporte; interactúa con el sistema como usuario administrativo \\
+	\midrule
+	
+	Egresado
+	& Graduado de un programa de la \ud
+	& Sin matrícula vigente; puede conservar derechos de uso de servicios \\
+\end{longtable}
+\endgroup
+
+La multiplicidad de tipos de docente plantea un dilema de modelado que se
+anticipó brevemente en el prefacio y que se resolverá en el
+Capítulo~\ref{cap:uml}: ¿debe \texttt{TipoDocente} ser un enumerado, una
+jerarquía de subclases o un conjunto de atributos booleanos? La respuesta
+depende de si los tipos difieren en comportamiento ---métodos--- o solo en
+datos ---atributos---. Si un docente visitante y un docente de planta
+responden de manera idéntica a todos los mensajes del sistema, el enumerado
+bastará; si sus comportamientos son disímiles ---por ejemplo, si la liquidación
+de honorarios sigue reglas distintas según el tipo de vinculación---,
+la jerarquía de subclases resulta más expresiva.
+
+\subsection{Órganos de gobierno y toma de decisiones}
+\label{subsec:organos-gobierno}
+
+Los órganos de gobierno de la \ud\ establecidos en el Artículo 18 del
+\acuerdo\ se presentan en la Tabla~\ref{tab:organos-gobierno}.
+
+\begingroup
+\small
+\begin{longtable}{L{3cm} L{4.5cm} L{5.5cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Órganos de gobierno de la \ud\ según el Art.\ 18 del \acuerdo.} \label{tab:organos-gobierno} \\
+	\toprule
+	\textbf{Órgano} & \textbf{Composición} & \textbf{Función principal} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Órgano} & \textbf{Composición} & \textbf{Función principal} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Consejo Superior Universitario
+	& Representantes de gobierno nacional, Presidente de la República, MEN, Gobernación, comunidad académica, estudiantes, egresados, sector productivo
+	& Máximo órgano de dirección y gobierno; expide el Estatuto General y los acuerdos de mayor jerarquía \\
+	\midrule
+	
+	Consejo Académico
+	& Rector, Vicerrectores, Decanos, representantes docentes y estudiantiles
+	& Dirección académica; expide normas de orden académico; aprueba programas y reformas curriculares \\
+	\midrule
+	
+	Rectoría
+	& Rector, elegido por el Consejo Superior
+	& Representación legal; dirección ejecutiva de la institución \\
+	\midrule
+	
+	Consejo de Facultad
+	& Decano, directores de Escuela, representantes docentes y estudiantiles
+	& Dirección de la Facultad; decisiones sobre programas y docentes en el nivel de Facultad \\
+	\midrule
+	
+	Consejo de Escuela
+	& Director de Escuela, docentes adscritos, representante estudiantil
+	& Gestión académica de la Escuela; asignación de carga docente \\
+	\midrule
+	
+	Consejo de Centro / Instituto
+	& Director, docentes vinculados, representante estudiantil (cuando aplica)
+	& Dirección del Centro o Instituto correspondiente \\
+	\midrule
+	
+	Consejo de Bienestar y Buen Vivir
+	& Vicerrector delegado, representantes de la comunidad universitaria
+	& Política de bienestar institucional \\
+\end{longtable}
+\endgroup
+
+\noindent
+El siguiente diagrama PlantUML sintetiza la estructura organizacional
+de la \ud\ tal como se modelará en el sistema de información:
+
+\begin{lstlisting}[style=plantumlStyle,
+  caption={Diagrama de estructura organizacional de la \ud\ (PlantUML).},
+  label={lst:plantuml-org}]
+@startuml estructura_ud
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam classBackgroundColor #F8F8FF
+skinparam classBorderColor #00467F
+skinparam ArrowColor #00467F
+
+package "Universidad Distrital FJC" {
+  class Universidad {
+    - nombre : String
+    - nit : String
+    + getFacultades() : List<Facultad>
+  }
+  class Facultad {
+    - nombre : String
+    - decano : String
+    + getEscuelas() : List<Escuela>
+  }
+  class Escuela {
+    - nombre : String
+    - directorEscuela : String
+    + getDocentesAdscritos() : List<Docente>
+  }
+  class Centro {
+    - nombre : String
+    - director : String
+  }
+  class Instituto {
+    - nombre : String
+    - director : String
+  }
+  class CABA {
+    - areaDeFormacion : String
+    - coordinador : String
+  }
+  class AreaDeFormacion {
+    - nombre : String
+  }
+  class ProgramaAcademico {
+    - nombre : String
+    - codigoSNIES : String
+    - nivel : NivelAcademico
+  }
+}
+
+Universidad "1" *-- "1..*" Facultad : contiene
+Facultad "1" *-- "1..*" Escuela : agrupa
+Facultad "1" o-- "0..*" Centro : contiene
+Facultad "1" o-- "0..*" Instituto : contiene
+Escuela "1" o-- "0..*" CABA : coordina
+Facultad "1" o-- "1..*" AreaDeFormacion : organiza
+AreaDeFormacion "1" --> "1..*" ProgramaAcademico : ofrece
+
+@enduml
+\end{lstlisting}
+
+%% ─────────────────────────────────────────────
+\section{El nuevo Estatuto Académico: sistema de formación,
+  currículo y programas}
+\label{sec:estatuto-academico}
+%% ─────────────────────────────────────────────
+
+La propuesta de Estatuto Académico de noviembre de 2025 articula el sistema
+de formación universitaria en torno a cuatro componentes que, desde la
+perspectiva del modelado orientado a objetos, constituyen las clases
+centrales del subsistema académico. La Tabla~\ref{tab:sistema-formacion}
+los describe con referencia a los artículos pertinentes.
+
+\begingroup
+\small
+\begin{longtable}{L{3cm} L{8.5cm} C{1.8cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Componentes del sistema de formación según el Estatuto Académico (propuesta, noviembre de 2025), Arts.\ 13--18.} \label{tab:sistema-formacion} \\
+	\toprule
+	\textbf{Componente} & \textbf{Descripción} & \textbf{Artículo} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Componente} & \textbf{Descripción} & \textbf{Artículo} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Formación universitaria
+	& Proceso intencional, sistemático y contextualizado que propende al desarrollo integral del sujeto en sus dimensiones cognitiva, ética, estética, cultural y ciudadana; articulado con el Proyecto Universitario Institucional (\textsc{PUI})
+	& Art.\ 13 \\
+	\midrule
+	
+	Currículo
+	& Conjunto organizado de propósitos, contenidos, estrategias pedagógicas y mecanismos de evaluación que orienta el proceso de formación en un programa académico; expresado en el Proyecto Educativo de Programa (PEP)
+	& Art.\ 14 \\
+	\midrule
+	
+	Docencia
+	& Práctica pedagógica profesional mediante la cual los docentes orientan los procesos de enseñanza-aprendizaje en los espacios académicos; articulada con la investigación y la extensión
+	& Art.\ 15 \\
+	\midrule
+	
+	Programa académico
+	& Unidad organizativa que ofrece un conjunto de espacios académicos orientados a la formación en un campo del conocimiento; regulado por el Decreto~1330 de 2019 y el Acuerdo~02 de 2020 del CESU; requiere registro calificado
+	& Art.\ 18 \\
+\end{longtable}
+\endgroup
+
+La cadena normativa PUI $\rightarrow$ PEF (Proyecto Educativo de Facultad)
+$\rightarrow$ PEP (Proyecto Educativo de Programa) constituye una jerarquía
+de documentos de política que el sistema de información deberá gestionar.
+Cada nivel hereda los propósitos del nivel superior y los particulariza
+para su unidad académica. El patrón de diseño \textit{Template Method}
+podría resultar adecuado para modelar esta particularización, según se
+analizará en el Capítulo~\ref{cap:java}.\footnote{%
+  La cadena PUI $\rightarrow$ PEF $\rightarrow$ PEP no es un requisito
+  formal de los estatutos de otras universidades colombianas. La arquitectura
+  de tres niveles es específica de la \ud\ y, por lo tanto, constituye
+  un argumento adicional para la elección de la institución como caso de
+  estudio: el dominio es auténtico e imposible de generar mediante extrapolación
+  a partir de sistemas genéricos.}
+
+%% ─────────────────────────────────────────────
+\section{Propósitos de Formación y de Aprendizaje (-PFA-) en la \ud}
+\label{sec:pfa}
+%% ─────────────────────────────────────────────
+
+Los Propósitos de Formación y de Aprendizaje (-PFA-) son la herramienta
+conceptual mediante la cual la \ud\ articula, en el nivel del programa y del
+espacio académico, las intenciones formativas del proyecto curricular con las
+estrategias de evaluación en el aula. El documento institucional de 2023
+---al momento de redactar este capítulo, la versión más reciente disponible---
+los organiza en tres ámbitos que la Tabla~\ref{tab:pfa-evaluacion} detalla
+junto con su relación con los mecanismos de evaluación formativa.
+
+\begingroup
+\small
+\begin{longtable}{L{2.5cm} L{4.5cm} L{6cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Ámbitos del -PFA- y su relación con la evaluación formativa. Fuente: Documento -PFA- \ud\ (2023) y \textcite{Decreto1330_2019}.} \label{tab:pfa-evaluacion} \\
+	\toprule
+	\textbf{Ámbito del -PFA-} & \textbf{Descripción} & \textbf{Relación con evaluación formativa} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Ámbito del -PFA-} & \textbf{Descripción} & \textbf{Relación con evaluación formativa} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Ontológico
+	& Se interroga por el tipo de sujeto que la formación busca contribuir a constituir; por el ser del estudiante como persona, ciudadano y profesional en devenir
+	& Evaluación mediante portafolios de reflexión personal y evidencias de desarrollo ético-ciudadano; difícil de reducir a indicadores numéricos \\
+	\midrule
+	
+	Epistemológico
+	& Se ocupa del conocimiento que el estudiante debe construir, las formas de acceder a él y los criterios de validación propios del campo disciplinar
+	& Evaluación mediante rúbricas de desempeño, tareas auténticas y proyectos de investigación formativa; articulado con los Resultados de Aprendizaje del Decreto~1330 de 2019 \\
+	\midrule
+	
+	Contextual
+	& Sitúa la formación en el contexto social, cultural, económico y político; propende a la pertinencia del programa frente a las necesidades del entorno
+	& Evaluación mediante proyectos de impacto social, prácticas profesionales y sistematización de experiencias comunitarias \\
+\end{longtable}
+\endgroup
+
+La articulación entre los -PFA- y el sistema de evaluación formal ---rúbricas,
+evidencias, calificaciones--- es uno de los retos más complejos del modelado.
+No es descartable que algunos ámbitos del -PFA- resistan la formalización
+en clases de datos con atributos discretos: el ámbito ontológico, en
+particular, parece resistirse a la representación tabular. Sin embargo,
+los ámbitos epistemológico y contextual sí generan requisitos funcionales
+concretos para el sistema de información, toda vez que se articulan con
+los Resultados de Aprendizaje (RA) formulados mediante verbos de la taxonomía
+de Bloom \autocite{MEN2020_RA}.
+
+%% ─────────────────────────────────────────────
+\section{Caso de estudio: sistema de información para el Estatuto
+  General y Académico}
+\label{sec:caso-estudio}
+%% ─────────────────────────────────────────────
+
+El sistema de información que actuará como hilo conductor del libro se
+estructura en cinco subsistemas funcionales, cuyo alcance queda delimitado
+en la lista siguiente:
+
+\begin{enumerate}[label=\textbf{SS-\arabic*.}]
+  \item \textbf{Gestión organizacional:} creación, consulta y modificación
+    de Facultades, Escuelas, Centros, Institutos y CABAS; relaciones de
+    pertenencia y jerarquía; gestión de directivos.
+  \item \textbf{Gestión de comunidad:} registro y consulta de docentes (con
+    sus cinco tipos de vinculación), estudiantes (pregrado y posgrado),
+    personal administrativo y egresados; gestión de adscripciones.
+  \item \textbf{Gestión académica:} programas académicos, planes de estudio,
+    espacios académicos, PEP; matrícula de estudiantes; asignación de
+    docentes a espacios académicos.
+  \item \textbf{Gestión de evaluación y -PFA-:} Resultados de Aprendizaje,
+    Propósitos de Formación y de Aprendizaje, rúbricas de evaluación,
+    evidencias de aprendizaje, seguimiento del avance del estudiante.
+  \item \textbf{Gestión de órganos colegiados:} registro de sesiones y
+    decisiones del Consejo Superior, Consejo Académico, Consejos de Facultad,
+    Escuela, Centro e Instituto; convocatorias y actas.
+\end{enumerate}
+
+\noindent
+Los módulos principales del sistema, en correspondencia con los subsistemas
+anteriores, son:
+
+\begin{itemize}
+  \item Módulo Organizacional (\texttt{org}): clases \texttt{Universidad},
+    \texttt{Facultad}, \texttt{Escuela}, \texttt{Centro}, \texttt{Instituto},
+    \texttt{CABA}, \texttt{AreaDeFormacion}.
+  \item Módulo Comunidad (\texttt{comunidad}): clases \texttt{Persona},
+    \texttt{Docente} (con \texttt{TipoDocente}), \texttt{Estudiante},
+    \texttt{PersonalAdministrativo}, \texttt{Egresado}.
+  \item Módulo Académico (\texttt{academico}): clases \texttt{ProgramaAcademico},
+    \texttt{PlanDeEstudios}, \texttt{EspacioAcademico},
+    \texttt{PEP}, \texttt{Matricula}.
+  \item Módulo Evaluación (\texttt{evaluacion}): clases
+    \texttt{ResultadoDeAprendizaje}, \texttt{PropositoDeFormacion},
+    \texttt{Rubrica}, \texttt{Criterio}, \texttt{Evidencia},
+    \texttt{Calificacion}.
+  \item Módulo Gobierno (\texttt{gobierno}): clases
+    \texttt{OrganoColegado}, \texttt{Sesion}, \texttt{Acta},
+    \texttt{Acuerdo}, \texttt{Resolucion}.
+\end{itemize}
+
+%% ─────────────────────────────────────────────
+\section{Metodología ágil con doce \textit{sprints}: visión general}
+\label{sec:sprints-vision}
+%% ─────────────────────────────────────────────
+
+El libro adopta una metodología pedagógica de doce \textit{sprints} de
+duración aproximada de una semana cada uno. La Tabla~\ref{tab:sprints-resumen}
+sintetiza el foco, el capítulo del libro y los artefactos principales de
+cada \textit{sprint}.
+
+\begin{longtable}{C{1.2cm} L{3.5cm} C{1.8cm} L{5cm}}
+  \toprule
+  \textbf{Sprint} & \textbf{Foco temático} & \textbf{Capítulo} &
+  \textbf{Artefactos principales} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Resumen de los doce \textit{sprints} del libro.}
+  \label{tab:sprints-resumen}
+  \endlastfoot
+  1 & Comprensión del dominio institucional & 1 &
+    Glosario de entidades; diagrama de contexto inicial \\
+  \midrule
+  2 & Levantamiento de requisitos & 2 &
+    Documento RF/RNF; \textit{product backlog} inicial \\
+  \midrule
+  3 & Validación de requisitos & 2 &
+    Acta de validación; \textit{backlog} refinado con criterios de aceptación \\
+  \midrule
+  4 & Modelo de dominio inicial & 3 &
+    Diagrama de clases: subsistemas organizacional y comunidad \\
+  \midrule
+  5 & Casos de uso y secuencias & 3 &
+    Diagrama CU completo; diagramas de secuencia principales \\
+  \midrule
+  6 & Implementación \java: organización y comunidad & 4 &
+    Clases \texttt{UnidadAcademica}, \texttt{Persona} y subclases en \java \\
+  \midrule
+  7 & Implementación \java: académico y evaluación & 4 &
+    Clases \texttt{ProgramaAcademico}, \texttt{Rubrica}, \texttt{Evidencia} \\
+  \midrule
+  8 & Implementación \rust: \textit{structs} y \textit{traits} & 5 &
+    Módulos \texttt{org} y \texttt{comunidad} en \rust; comparación con \java \\
+  \midrule
+  9 & Implementación \rust: académico y evaluación & 5 &
+    Módulos \texttt{academico} y \texttt{evaluacion} en \rust \\
+  \midrule
+  10 & Pruebas unitarias e integración & 6 &
+    Suite de pruebas JUnit y Cargo test; informe de cobertura \\
+  \midrule
+  11 & Refactorización y patrones de diseño & 6 &
+    Aplicación de patrones \textit{Composite}, \textit{State},
+    \textit{Observer}; métricas de calidad \\
+  \midrule
+  12 & Reflexión crítica: software generativo y ética & 7 &
+    Informe de análisis crítico; rúbrica de evaluación de asistentes \\
+\end{longtable}
+
+La progresión sigue un arco deliberado: del análisis del dominio (Sprints~1--3)
+al modelado (Sprints~4--5), a la implementación (Sprints~6--9), a la
+verificación y mejora (Sprints~10--11) y, finalmente, a la reflexión
+crítica sobre el proceso (Sprint~12). No es una secuencia rígida; el
+estudiante deberá revisitar decisiones de análisis cuando la implementación
+revele ambigüedades en el modelo.
+
+%% ─────────────────────────────────────────────
+\section{Comparativa \java\ vs.\ \rust\ para el dominio académico}
+\label{sec:java-rust-intro}
+%% ─────────────────────────────────────────────
+
+La elección de \java\ y \rust\ como lenguajes de implementación no es
+arbitraria. La Tabla~\ref{tab:java-rust-comparativa} los contrasta en las
+dimensiones más relevantes para el dominio académico-administrativo de la \ud.
+
+\begingroup
+\small
+\begin{longtable}{L{2.8cm} L{5.5cm} L{5.5cm}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Comparativa \java\ vs.\ \rust\ en dimensiones relevantes para el dominio académico. Fuentes: \textcite{Bloch2018} y \textcite{Klabnik2023}.} \label{tab:java-rust-comparativa} \\
+	\toprule
+	\textbf{Dimensión} & \textbf{\java} & \textbf{\rust} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Dimensión} & \textbf{\java} & \textbf{\rust} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Tipado
+	& Estático; tipado nominal; genéricos con borrado de tipos en tiempo de ejecución; \textit{wildcards} (\texttt{? extends}, \texttt{? super})
+	& Estático; tipado nominal y estructural; genéricos monomorfizados; sistema de tipos más expresivo con \textit{traits} \\
+	\midrule
+	
+	Manejo de memoria
+	& Recolector de basura (\textit{garbage collector}); sin gestión manual; pausa del GC puede afectar latencia
+	& Sin GC; sistema de \textit{ownership} con comprobación en tiempo de compilación; memoria liberada de forma determinista \\
+	\midrule
+	
+	Concurrencia
+	& Hilos con monitores (\texttt{synchronized}); \textit{java.util.concurrent}; \texttt{CompletableFuture}; riesgo de condiciones de carrera
+	& Concurrencia garantizada por el compilador (\textit{fearless concurrency}); \texttt{Arc}, \texttt{Mutex}; sin carreras de datos posibles en código seguro \\
+	\midrule
+	
+	Ecosistema -GUI-
+	& JavaFX, Swing, SWT; maduros y estables; integración con herramientas de construcción (Maven, Gradle)
+	& Ecosistema -GUI- menos maduro; opciones: \textit{egui}, \textit{Tauri}; preferible para \textit{backend} o servicios web \\
+	\midrule
+	
+	Curva de aprendizaje
+	& Moderada para fundamentos de -POO-; la biblioteca estándar es amplia y la documentación abundante
+	& Pronunciada; el sistema de \textit{ownership} requiere cambio de modelo mental; recomendado como segundo lenguaje tras \java \\
+\end{longtable}
+\endgroup
+
+Los fragmentos de código siguientes ilustran la clase \texttt{Facultad}
+en ambos lenguajes:
+
+\begin{lstlisting}[style=javaStyle,
+  caption={Clase \texttt{Facultad} en \java\ (versión simplificada).},
+  label={lst:java-facultad}]
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public class Facultad extends UnidadAcademica {
+    private String decano;
+    private List<Escuela> escuelas;
+    private List<ProgramaAcademico> programas;
+
+    public Facultad(String nombre, String codigo, String decano) {
+        super(nombre, codigo);
+        this.decano = decano;
+        this.escuelas = new ArrayList<>();
+        this.programas = new ArrayList<>();
+    }
+
+    public void agregarEscuela(Escuela e) {
+        if (e == null) throw new IllegalArgumentException(
+            "La escuela no puede ser nula.");
+        escuelas.add(e);
+    }
+
+    public List<Escuela> getEscuelas() {
+        return Collections.unmodifiableList(escuelas);
+    }
+
+    @Override
+    public String getTipo() { return "Facultad"; }
+
+    public String getDecano() { return decano; }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=rustStyle,
+  caption={\textit{Struct} \texttt{Facultad} en \rust\ con
+    implementación de métodos.},
+  label={lst:rust-facultad}]
+#[derive(Debug, Clone)]
+pub struct Facultad {
+    pub nombre: String,
+    pub codigo: String,
+    pub decano: String,
+    escuelas: Vec<Escuela>,
+    programas: Vec<ProgramaAcademico>,
+}
+
+impl Facultad {
+    pub fn new(nombre: &str,
+               codigo: &str,
+               decano: &str) -> Self {
+        Facultad {
+            nombre: nombre.to_string(),
+            codigo: codigo.to_string(),
+            decano: decano.to_string(),
+            escuelas: Vec::new(),
+            programas: Vec::new(),
+        }
+    }
+
+    pub fn agregar_escuela(&mut self, e: Escuela) {
+        self.escuelas.push(e);
+    }
+
+    pub fn escuelas(&self) -> &[Escuela] {
+        &self.escuelas
+    }
+
+    pub fn tipo(&self) -> &'static str { "Facultad" }
+}
+\end{lstlisting}
+
+Persiste, sin embargo, la duda de si \rust\ es apropiado como lenguaje
+introductorio para estudiantes que cursan por primera vez la asignatura
+de -POO- en la \ud. La experiencia observada entre 2019 y 2025 en la
+Facultad de Ingeniería sugiere que el sistema de \textit{ownership} puede
+suscitar más confusión que iluminación cuando el estudiante no ha consolidado
+aún los conceptos de encapsulamiento y herencia. Por esta razón, el libro
+presenta \java\ como lenguaje primario y \rust\ como contraste enriquecedor,
+no como sustituto.
+
+%% ─────────────────────────────────────────────
+\section{Reflexión sobre software generativo en el aprendizaje
+  de la programación}
+\label{sec:ia-reflexion-intro}
+%% ─────────────────────────────────────────────
+
+La pregunta que atraviesa todo el libro no admite respuesta sencilla.
+Los asistentes computacionales generativos ---disponibles de forma
+prácticamente universal entre los estudiantes de ingeniería al momento
+de redactar este texto, en marzo de 2026--- producen código \java\ y
+diagramas -UML- con rapidez y con un nivel de corrección sintáctica que,
+en el peor de los casos, supera el de muchos estudiantes de primer año.
+Ello plantea un escollo pedagógico genuino: si el estudiante puede obtener
+en segundos la clase \texttt{Facultad} con sus métodos de acceso, ¿qué
+valor agrega el proceso de diseño manual?
+
+El marco de análisis crítico adoptado en este libro propone cuatro
+categorías para evaluar el código generado por asistentes computacionales:
+
+\begin{enumerate}[label=\textbf{C\arabic*.}]
+  \item \textbf{Coherencia con el dominio:} ¿el código generado refleja
+    las restricciones del estatuto, o las ignora en favor de patrones
+    genéricos? Un asistente que modela \texttt{Facultad} con una lista
+    de \texttt{Docente} ---en lugar de una lista de \texttt{Escuela},
+    ya que los docentes se adscriben a Escuelas, no a Facultades---
+    evidencia una comprensión superficial del dominio.
+  \item \textbf{Corrección de las relaciones:} ¿el código distingue
+    entre composición, agregación y asociación simple? La diferencia
+    entre contener una lista de \texttt{Escuela} (composición) y
+    referenciar un \texttt{Director} (asociación) tiene implicaciones
+    directas sobre la gestión del ciclo de vida de los objetos.
+  \item \textbf{Aplicabilidad de principios -POO-:} ¿el código respeta
+    el encapsulamiento? ¿Emplea herencia donde corresponde y composición
+    donde es más adecuada? ¿Los métodos tienen nombres coherentes con el
+    vocabulario del dominio?
+  \item \textbf{Mantenibilidad a largo plazo:} ¿el código podría
+    incorporarse en un sistema real de la \ud\ sin refactorización
+    sustancial? ¿Está alineado con los principios \textsc{SOLID}
+    \autocite{Martin2017}?
+\end{enumerate}
+
+Este marco se aplicará en cada uno de los doce \textit{sprints} como
+parte de la actividad de reflexión. Queda por determinar si la aplicación
+sistemática del marco desarrolla, en los estudiantes, una actitud genuinamente
+crítica frente al software generativo o si, con el tiempo, se convierte
+en un trámite formal sin incidencia real en las decisiones de diseño.\footnote{%
+  La preocupación no es abstracta. En los semestres 2024-I y 2024-II,
+  varios estudiantes de Ingeniería de Sistemas de la \ud\ entregaron
+  código generado con mínimas modificaciones sin haber examinado si
+  las clases producidas eran coherentes con el dominio del problema.
+  La detección de este comportamiento llevó al autor a incorporar la
+  actividad comparativa como componente de evaluación.}
+
+%% ─────────────────────────────────────────────
+%% SPRINT 1
+%% ─────────────────────────────────────────────
+\section*{Sprint 1: Comprensión del dominio institucional}
+\label{sprint:1}
+\addcontentsline{toc}{section}{Sprint 1: Comprensión del dominio institucional}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 1 — Comprensión del dominio institucional}]
+  \textbf{Duración estimada:} 1 semana\\
+  \textbf{Objetivo:} Identificar y caracterizar las entidades del dominio
+  del \acuerdo\ y del Estatuto Académico como paso previo al modelado orientado a objetos.\\
+  \textbf{Entregables:} (1) Glosario de entidades; (2) Diagrama de contexto
+  inicial; (3) Tabla comparativa propia vs.\ asistente computacional.
+\end{tcolorbox}
+
+\bigskip
+
+\subsection*{Tabla del Sprint 1}
+
+\begin{longtable}{L{3.5cm} L{4.5cm} L{4.5cm}}
+  \sprintcabecera
+  \endhead
+  \bottomrule
+  \caption{Entregables, características del programa y criterios de la
+    rúbrica del Sprint 1.}
+  \label{tab:sprint1}
+  \endlastfoot
+  Glosario de entidades institucionales (Facultad, Escuela, Centro,
+  Instituto, CABA, Docente, Estudiante, órganos de gobierno) con
+  definición, nivel jerárquico y referencia al artículo del \acuerdo
+  & Reconocer las entidades del dominio del \acuerdo\ y sus relaciones;
+    aplicar técnicas de análisis de documentos normativos
+  & El estudiante identifica correctamente al menos 15 entidades del
+    dominio, las define con vocabulario coherente con el estatuto e
+    infiere 5 relaciones entre ellas con argumentación normativa \\
+  \midrule
+  Diagrama de contexto del sistema (versión inicial, representación
+  libre, no -UML- formal): actores internos, actores externos, flujos
+  de información principales
+  & Delimitar el alcance del sistema de información frente a sistemas
+    externos (nómina, biblioteca, MEN, plataformas de \textit{e-learning})
+    y actores institucionales
+  & El diagrama distingue con precisión los actores internos, los actores
+    externos y los flujos de información principales, con justificación
+    basada en el \acuerdo \\
+  \midrule
+  Tabla comparativa propia vs.\ asistente computacional generativo
+  (mínimo 10 filas): Entidad / Propuesta propia / Propuesta del
+  asistente / Diferencias / Valoración crítica
+  & Desarrollar pensamiento crítico frente al diseño generado
+    automáticamente; aplicar las cuatro categorías del marco de análisis
+    (Sección~\ref{sec:ia-reflexion-intro})
+  & El estudiante identifica al menos 3 diferencias conceptuales
+    significativas y las argumenta con base en el dominio institucional;
+    evidencia comprensión de las limitaciones del asistente frente a
+    dominios normativos específicos \\
+  \midrule
+  Bitácora de proceso (al menos 3 entradas con fecha y hora previas
+  a la consulta del asistente computacional)
+  & Documentar el proceso de construcción de conocimiento; distinguir
+    el aprendizaje mediado por el análisis directo del estatuto del
+    mediado por el asistente
+  & La bitácora evidencia proceso de elaboración propio, con argumentación
+    y dudas registradas, anteriores en el tiempo a la consulta del
+    asistente computacional \\
+\end{longtable}
+
+\bigskip
+
+%% ─── Tabla de alineación completa ────────────────────────
+\subsection*{Tabla de alineación: libro, syllabus y resultados de aprendizaje}
+
+\begin{longtable}{L{2.4cm} L{3.2cm} L{4cm} L{3.5cm}}
+  \toprule
+  \textbf{Unidad /\newline Capítulo} & \textbf{Temas del syllabus} &
+  \textbf{Resultados de aprendizaje} & \textbf{Actividades /\newline Evidencias} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \caption{Tabla de alineación completa: unidades del libro, syllabus,
+    resultados de aprendizaje y actividades/evidencias.}
+  \label{tab:alineacion}
+  \endlastfoot
+  Cap.~1 --- Fundamentos de -POO- y contexto institucional
+  & Paradigmas de programación; estructura académica de la \ud;
+    encapsulamiento, herencia, polimorfismo, abstracción; introducción
+    a \java\ y \rust
+  & El estudiante caracteriza los cuatro paradigmas de programación y
+    distingue el modelo orientado a objetos; identifica las entidades
+    del dominio institucional (\acuerdo)
+  & Glosario de entidades; diagrama de contexto; tabla comparativa
+    asistente/propio (Sprint~1) \\
+  \midrule
+  Cap.~2 --- Requisitos del sistema de información
+  & Análisis de requisitos funcionales y no funcionales; historias de
+    usuario; actores del sistema; priorización MoSCoW; modelo de contexto
+  & El estudiante formula al menos 20 requisitos funcionales coherentes
+    con el dominio normativo; distingue RF de RNF; formula historias de
+    usuario con criterios de aceptación verificables
+  & Documento RF/RNF; \textit{product backlog}; acta de validación;
+    actividades Sprints~2 y 3 \\
+  \midrule
+  Cap.~3 --- Modelado -UML-
+  & Diagramas de clases, casos de uso, secuencia y estado; \plantuml\
+    como herramienta; principios de diseño orientado a objetos
+  & El estudiante construye diagramas -UML- coherentes con el dominio;
+    justifica decisiones de herencia, composición y asociación; identifica
+    patrones de diseño aplicables
+  & Diagramas -UML- en \plantuml; análisis crítico de modelos generados
+    por asistente; actividades Sprints~4 y 5 \\
+  \midrule
+  Cap.~4 --- Implementación en \java
+  & Clases, interfaces, herencia, polimorfismo, colecciones, excepciones;
+    principios SOLID; pruebas con JUnit
+  & El estudiante implementa el modelo de dominio en \java\ respetando
+    los principios SOLID; aplica al menos dos patrones de diseño del
+    catálogo Gang of Four \autocite{Gamma1994}
+  & Código fuente en \java; informe de pruebas JUnit; actividades
+    Sprints~6 y 7 \\
+  \midrule
+  Cap.~5 --- Implementación en \rust
+  & \textit{Structs}, \textit{enums}, \textit{traits}, \textit{ownership},
+    \textit{lifetimes}, módulos; comparación con \java
+  & El estudiante implementa el modelo de dominio en \rust\ y explica
+    las diferencias de diseño respecto de la implementación en \java;
+    comprende el sistema de \textit{ownership}
+  & Código fuente en \rust; informe comparativo \java/\rust; actividades
+    Sprints~8 y 9 \\
+  \midrule
+  Cap.~6 --- Pruebas y calidad
+  & Pruebas unitarias, de integración y de sistema; cobertura; métricas
+    de calidad; refactorización; deuda técnica
+  & El estudiante diseña una suite de pruebas con cobertura superior al
+    80\%; identifica y aplica al menos una refactorización para mejorar
+    la mantenibilidad del código
+  & Suite de pruebas; informe de cobertura; informe de refactorización;
+    actividades Sprints~10 y 11 \\
+  \midrule
+  Cap.~7 --- Software generativo y ética en la ingeniería
+  & Marco de análisis crítico de código generado; integridad académica;
+    ética del software; responsabilidad profesional
+  & El estudiante evalúa sistemáticamente el código generado por
+    asistentes computacionales mediante el marco de cuatro categorías;
+    articula una posición argumentada sobre el uso responsable de estas
+    herramientas
+  & Informe de análisis crítico; presentación final; actividad Sprint~12 \\
+\end{longtable}
+
+\bigskip
+
+%% ─── Actividad IA ────────────────────────────
+\subsection*{Actividad de reflexión: software generativo y diseño orientado a objetos}
+\label{act:ia-sprint1}
+
+\begin{tcolorbox}[actividadIA,
+  title={Actividad de reflexión (Sprint~1) —
+         Software generativo y diseño orientado a objetos}]
+
+\textbf{Instrucción general.}
+Antes de consultar cualquier asistente computacional generativo,
+el estudiante debe elaborar de manera individual una propuesta inicial
+de las entidades del dominio institucional de la \ud\ y de las relaciones
+entre ellas, a partir únicamente de la lectura directa del \acuerdo.
+La propuesta se registra en la bitácora de proceso con fecha y hora.
+Seguidamente, se solicita al asistente computacional la misma tarea
+---identificar las entidades del sistema de información para la \ud\
+según su Estatuto General--- y se comparan ambas propuestas de manera
+sistemática.
+
+\bigskip
+\textbf{Preguntas orientadoras:}
+\begin{enumerate}[label=\arabic*.]
+  \item ¿Qué entidades identificó el asistente computacional que usted
+        no había considerado? ¿Son pertinentes para el dominio del estatuto?
+        Argumente con referencia al artículo específico del \acuerdo.
+  \item ¿Qué entidades identificó usted que el asistente omitió o
+        denominó de manera disímil? ¿Cuál denominación resulta más
+        coherente con el texto del \acuerdo?
+  \item ¿El asistente reproduce errores conceptuales sobre la estructura
+        de la \ud? Identifique al menos dos (por ejemplo: ¿adscribe
+        docentes a Facultades en lugar de a Escuelas?) y explique su
+        origen probable.
+  \item ¿En qué medida la propuesta del asistente refleja el dominio
+        real de la \ud, o en cambio proyecta un sistema universitario
+        genérico similar a los modelos de manual?
+\end{enumerate}
+
+\bigskip
+\textbf{Producto esperado:} Tabla comparativa (mínimo 10 filas) con
+columnas: Entidad / Propuesta propia / Propuesta del asistente /
+Diferencias / Valoración crítica (categoría C1--C4 del marco de análisis).
+
+\bigskip
+\textbf{Rúbrica de evaluación del Sprint~1 (actividad de reflexión):}
+
+\begin{tabular}{L{3.5cm} L{2.5cm} L{2.5cm} L{2.5cm}}
+  \toprule
+  \textbf{Criterio} & \textbf{Insuficiente (1)} &
+  \textbf{Aceptable (2--3)} & \textbf{Sobresaliente (4--5)} \\
+  \midrule
+  Identificación de entidades del dominio
+  & Menos de 8 entidades identificadas correctamente
+  & Entre 8 y 12 entidades con denominación coherente con el estatuto
+  & 15 o más entidades, todas con denominación y caracterización
+    respaldada en el texto del \acuerdo \\
+  \midrule
+  Calidad del análisis crítico
+  & El estudiante no identifica diferencias significativas o las
+    diferencias son superficiales
+  & El estudiante identifica 2--3 diferencias con argumentación básica
+  & El estudiante identifica 4 o más diferencias significativas con
+    argumentación respaldada en el dominio institucional y referencia
+    a los artículos del estatuto \\
+  \midrule
+  Proceso de elaboración (bitácora)
+  & No se evidencia proceso previo a la consulta del asistente
+  & Se evidencia proceso parcial; la propuesta propia antecede a la
+    consulta pero no está documentada con detalle
+  & Se documenta con detalle el proceso de elaboración propio, con
+    fecha y hora anteriores a la consulta; la bitácora registra dudas,
+    correcciones y reflexiones del proceso \\
+  \midrule
+  Coherencia con el marco de análisis crítico
+  & No se aplica el marco de cuatro categorías
+  & Se aplica el marco de manera parcial (1--2 categorías)
+  & Se aplica el marco completo (C1--C4) con ejemplos concretos y
+    argumentación referenciada al dominio institucional \\
+  \bottomrule
+\end{tabular}
+
+\end{tcolorbox}

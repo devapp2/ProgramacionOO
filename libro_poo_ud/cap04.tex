@@ -1,0 +1,2070 @@
+%% ============================================================
+%% cap04.tex — Capítulo 4: Implementación en Java
+%% Programación Orientada a Objetos: Diseño e Implementación
+%% de un Sistema de Información Académico-Administrativo
+%% para la Universidad Distrital Francisco José de Caldas
+%%
+%% Autor: Roberto Albeiro Pava-Díaz, Ph.D.
+%% ============================================================
+
+\chapter{Implementación en \java}
+\label{cap:java}
+
+
+\noindent
+El tránsito del diagrama UML a la línea de código representa, quizás, el momento más
+revelador del proceso de aprendizaje en \poo. Es allí donde las abstracciones del
+modelado se confrontan con las restricciones concretas de un lenguaje, de un compilador
+y, sobre todo, de un dominio que nunca es tan ordenado como el papel sugiere. El dominio
+del estatuto de la \ud\ no constituye excepción: la jerarquía de unidades académicas,
+la multiplicidad de vínculos docentes y la granularidad del sistema de evaluación
+formativa imponen decisiones de diseño que no se resuelven en el pizarrón.
+
+Este capítulo expone la implementación completa del sistema en \java, lenguaje que
+ha acompañado la enseñanza de la orientación a objetos durante más de dos décadas y
+cuya plataforma JVM ofrece un ecosistema maduro para aplicaciones de gestión institucional.
+Se examinan la arquitectura por capas, las clases del dominio, los patrones de diseño
+adoptados, el manejo de excepciones, la interfaz gráfica con JavaFX y la persistencia
+mediante serialización JSON. Cada sección incluye código fuente completo con comentarios
+Javadoc, de manera que el lector pueda trasladar los listados directamente al entorno
+de desarrollo integrado.\footnote{El proyecto completo, estructurado como proyecto Maven
+listo para Visual Studio Code, se encuentra disponible en el directorio
+\texttt{proyecto\_java\_estatuto/} que acompaña este libro. Su compilación requiere
+Java~17 o superior y Maven~3.8+.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Arquitectura del proyecto \java}
+\label{sec:java-arquitectura}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+El principio de separación de responsabilidades (\textit{separation of concerns})
+constituye el fundamento sobre el cual se erige la arquitectura del sistema.
+Se adopta el patrón arquitectónico Modelo-Vista-Controlador (MVC), que distribuye
+la lógica del sistema en tres capas bien delimitadas, reduciendo el acoplamiento y
+facilitando la evolución independiente de cada componente.\footnote{La adopción de MVC
+en aplicaciones de gestión académica universitaria ha sido documentada, entre otros,
+por \textcite{Gamma1994} y, en el contexto latinoamericano, por trabajos de modelado
+institucional que abordan la complejidad de los sistemas de información universitarios.}
+
+\subsection{Estructura de paquetes}
+
+La tabla~\ref{tab:paquetes-java} describe los cinco paquetes que conforman el entramado
+operativo del sistema, su responsabilidad asignada y las clases representativas que
+cada uno alberga.
+
+\begingroup
+\small
+\begin{longtable}{@{}L{5cm} L{3.5cm} L{6cm}@{}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Paquetes del sistema y sus responsabilidades.} \label{tab:paquetes-java} \\
+	\toprule
+	\textbf{Paquete} & \textbf{Capa MVC} & \textbf{Responsabilidad principal} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Paquete} & \textbf{Capa MVC} & \textbf{Responsabilidad principal} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	\texttt{co.edu.udistrital.} \texttt{estatuto.modelo} &
+	Modelo &
+	Clases de dominio: entidades académico-administrativas, enumeraciones y objetos de valor \\
+	\midrule
+	
+	\texttt{co.edu.udistrital.} \texttt{estatuto.controlador} &
+	Controlador &
+	Lógica de negocio, validaciones, orquestación de operaciones CRUD \\
+	\midrule
+	
+	\texttt{co.edu.udistrital.} \texttt{estatuto.vista} &
+	Vista &
+	Componentes JavaFX: ventanas, formularios, tablas, menús \\
+	\midrule
+	
+	\texttt{co.edu.udistrital.} \texttt{estatuto.persistencia} &
+	Infraestructura &
+	Acceso a datos mediante patrón DAO; serialización/deserialización JSON con Gson \\
+	\midrule
+	
+	\texttt{co.edu.udistrital.} \texttt{estatuto.util} &
+	Transversal &
+	Validadores, formateadores de fecha, constantes del sistema \\
+\end{longtable}
+\endgroup
+
+\noindent
+Los paquetes \texttt{patron} y \texttt{excepcion} complementan la estructura anterior;
+el primero aloja los patrones de diseño implementados (Factory Method, Strategy, Observer)
+y el segundo, la jerarquía de excepciones del dominio. Esta decisión de separar los
+patrones en un paquete propio ---discutible desde la perspectiva de la cohesión--- se
+justifica didácticamente: facilita la identificación y el estudio aislado de cada patrón.
+
+\subsection{JavaFX como \textit{framework} de interfaz gráfica}
+
+La elección de JavaFX como \textit{framework} GUI obedece a tres razones concurrentes.
+Primera, su integración nativa con el ecosistema \java\ permite que los estudiantes
+reutilicen conceptos ya adquiridos (herencia, eventos, hilos) sin abandonar el lenguaje.
+Segunda, el modelo de componentes de JavaFX ---basado en un grafo de escena
+(\textit{scene graph})--- refuerza la comprensión de las jerarquías de objetos:
+cada nodo es un objeto que hereda de \texttt{javafx.scene.Node}, exhibiendo
+polimorfismo en cada interacción con la interfaz. Tercera, la separación entre
+la definición de la interfaz (FXML) y su lógica (controlador JavaFX) ilustra,
+en un contexto práctico, el principio de separación de responsabilidades que se
+defiende en este libro.\footnote{JavaFX fue desacoplado del JDK estándar a partir
+de Java~11. Para este proyecto se utiliza JavaFX~21 LTS como dependencia Maven,
+lo que garantiza compatibilidad con Java~17 y Java~21.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Clases fundamentales del dominio}
+\label{sec:java-dominio}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+El modelado del dominio traduce las entidades identificadas en el capítulo~\ref{cap:modelado}
+a clases \java\ concretas. La fidelidad a ese modelo no implica, sin embargo, una
+correspondencia mecánica uno a uno: la implementación introduce decisiones técnicas
+---constructores, validadores, sobreescritura de \texttt{equals}--- que el diagrama
+UML soslaya deliberadamente. A continuación se presentan las clases agrupadas según
+su función en el dominio.
+
+\subsection{Clases de entidad organizacional}
+\label{subsec:entidad-organizacional}
+
+La clase abstracta \texttt{UnidadAcademica} constituye la raíz de la jerarquía
+de entidades organizacionales. Toda vez que el \acuerdo\ define Facultades, Escuelas,
+Centros e Institutos como unidades académico-administrativas con atributos comunes
+---nombre, código y fecha de creación---, resulta natural encapsular esos atributos
+en una superclase que los concrete y obligue a sus subclases a declarar su tipo mediante
+el método abstracto \texttt{getTipo()}.
+
+\begin{lstlisting}[style=javaStyle, caption={Clase abstracta \texttt{UnidadAcademica}}, label={lst:unidad-academica}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.time.LocalDate;
+import java.util.Objects;
+
+/**
+ * Clase abstracta que representa una unidad académico-administrativa
+ * de la Universidad Distrital Francisco José de Caldas.
+ *
+ * <p>Conforme al Acuerdo 004 de 2025 (Estatuto General), toda unidad
+ * académica posee un nombre, un código institucional, una fecha de
+ * creación oficial y un director designado por el órgano competente.</p>
+ *
+ * @author Roberto Albeiro Pava-Díaz
+ * @version 1.0
+ */
+public abstract class UnidadAcademica {
+
+    /** Nombre oficial de la unidad académica. */
+    private String nombre;
+
+    /** Código institucional único asignado por la Rectoría. */
+    private String codigo;
+
+    /** Fecha de creación o reconocimiento oficial de la unidad. */
+    private LocalDate fechaCreacion;
+
+    /** Nombre completo del director o directora vigente. */
+    private String director;
+
+    /**
+     * Construye una unidad académica con los datos básicos.
+     *
+     * @param nombre        nombre oficial de la unidad
+     * @param codigo        código institucional (no nulo, no vacío)
+     * @param fechaCreacion fecha de creación oficial
+     * @param director      nombre del director vigente
+     * @throws IllegalArgumentException si el código es nulo o vacío
+     */
+    protected UnidadAcademica(String nombre, String codigo,
+                               LocalDate fechaCreacion, String director) {
+        if (codigo == null || codigo.isBlank()) {
+            throw new IllegalArgumentException(
+                "El código de la unidad académica no puede ser nulo ni vacío.");
+        }
+        this.nombre = Objects.requireNonNull(nombre, "El nombre no puede ser nulo.");
+        this.codigo = codigo.trim().toUpperCase();
+        this.fechaCreacion = fechaCreacion;
+        this.director = director;
+    }
+
+    /**
+     * Retorna el tipo de unidad académica (Facultad, Escuela, Centro, etc.).
+     * Cada subclase debe implementar este método con su denominación específica.
+     *
+     * @return cadena descriptiva del tipo de unidad
+     */
+    public abstract String getTipo();
+
+    // ── Getters y Setters ──────────────────────────────────────────────────
+
+    /** @return nombre oficial de la unidad */
+    public String getNombre() { return nombre; }
+
+    /**
+     * Actualiza el nombre oficial de la unidad.
+     * @param nombre nuevo nombre (no nulo, no vacío)
+     */
+    public void setNombre(String nombre) {
+        if (nombre == null || nombre.isBlank())
+            throw new IllegalArgumentException("El nombre no puede ser vacío.");
+        this.nombre = nombre.trim();
+    }
+
+    /** @return código institucional */
+    public String getCodigo() { return codigo; }
+
+    /**
+     * Actualiza el código institucional. Se normaliza a mayúsculas.
+     * @param codigo nuevo código
+     */
+    public void setCodigo(String codigo) {
+        if (codigo == null || codigo.isBlank())
+            throw new IllegalArgumentException("El código no puede ser vacío.");
+        this.codigo = codigo.trim().toUpperCase();
+    }
+
+    /** @return fecha de creación oficial */
+    public LocalDate getFechaCreacion() { return fechaCreacion; }
+
+    /** @param fechaCreacion nueva fecha de creación */
+    public void setFechaCreacion(LocalDate fechaCreacion) {
+        this.fechaCreacion = fechaCreacion;
+    }
+
+    /** @return nombre del director vigente */
+    public String getDirector() { return director; }
+
+    /** @param director nombre del nuevo director */
+    public void setDirector(String director) { this.director = director; }
+
+    // ── equals, hashCode, toString ─────────────────────────────────────────
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof UnidadAcademica u)) return false;
+        return codigo.equals(u.codigo);
+    }
+
+    @Override
+    public int hashCode() { return Objects.hash(codigo); }
+
+    @Override
+    public String toString() {
+        return String.format("%s[codigo=%s, nombre=%s, director=%s]",
+                             getTipo(), codigo, nombre, director);
+    }
+}
+\end{lstlisting}
+
+\noindent
+La clase \texttt{Facultad} extiende \texttt{UnidadAcademica} e incorpora los atributos
+propios de su nivel jerárquico: el decano o decana y la lista de escuelas adscritas.
+La agregación de escuelas se implementa mediante una lista mutable que el controlador
+gestiona externamente, de manera que la clase de dominio no asuma responsabilidades
+de persistencia.\footnote{Esta separación entre el objeto de dominio y su repositorio
+corresponde al patrón \textit{Domain Model} documentado por \textcite{fowler2002patterns}.}
+
+\begin{lstlisting}[style=javaStyle, caption={Clase \texttt{Facultad}}, label={lst:facultad}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Representa una Facultad de la Universidad Distrital.
+ *
+ * <p>Las Facultades son las unidades académico-administrativas de primer
+ * nivel (Art. 24, Acuerdo 004 de 2025). Cada Facultad está encabezada
+ * por un Decano o Decana y agrupa un conjunto de Escuelas.</p>
+ *
+ * @author Roberto Albeiro Pava-Díaz
+ */
+public class Facultad extends UnidadAcademica {
+
+    /** Nombre completo del decano o decana vigente. */
+    private String decano;
+
+    /** Lista de escuelas adscritas a esta Facultad. */
+    private final List<Escuela> escuelas;
+
+    /**
+     * Construye una Facultad con los datos mínimos requeridos.
+     *
+     * @param nombre        nombre oficial de la facultad
+     * @param codigo        código institucional
+     * @param fechaCreacion fecha de creación
+     * @param director      director académico (equivalente al decano aquí)
+     * @param decano        nombre del decano o decana
+     */
+    public Facultad(String nombre, String codigo,
+                    LocalDate fechaCreacion, String director, String decano) {
+        super(nombre, codigo, fechaCreacion, director);
+        this.decano = Objects.requireNonNull(decano, "El decano no puede ser nulo.");
+        this.escuelas = new ArrayList<>();
+    }
+
+    @Override
+    public String getTipo() { return "Facultad"; }
+
+    /**
+     * Agrega una Escuela a la lista de escuelas de la Facultad.
+     * No se permiten escuelas duplicadas (comparación por código).
+     *
+     * @param escuela escuela a agregar
+     * @return {@code true} si se agregó, {@code false} si ya existía
+     */
+    public boolean agregarEscuela(Escuela escuela) {
+        Objects.requireNonNull(escuela, "La escuela no puede ser nula.");
+        if (escuelas.contains(escuela)) return false;
+        return escuelas.add(escuela);
+    }
+
+    /**
+     * Elimina una Escuela de la lista.
+     *
+     * @param codigo código de la escuela a eliminar
+     * @return {@code true} si se eliminó
+     */
+    public boolean eliminarEscuela(String codigo) {
+        return escuelas.removeIf(e -> e.getCodigo().equals(codigo));
+    }
+
+    /** @return vista no modificable de la lista de escuelas */
+    public List<Escuela> getEscuelas() {
+        return Collections.unmodifiableList(escuelas);
+    }
+
+    /** @return nombre del decano o decana */
+    public String getDecano() { return decano; }
+
+    /** @param decano nombre del nuevo decano */
+    public void setDecano(String decano) { this.decano = decano; }
+
+    @Override
+    public String toString() {
+        return String.format("Facultad[codigo=%s, nombre=%s, decano=%s, escuelas=%d]",
+                             getCodigo(), getNombre(), decano, escuelas.size());
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=javaStyle, caption={Clases \texttt{Escuela}, \texttt{Centro} e \texttt{Instituto}}, label={lst:escuela-centro}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.time.LocalDate;
+import java.util.*;
+
+/**
+ * Representa una Escuela adscrita a una Facultad.
+ * Todos los docentes de la universidad pertenecen a una Escuela
+ * (Art. 28, Acuerdo 004 de 2025).
+ */
+public class Escuela extends UnidadAcademica {
+
+    private final List<Docente>  docentes;
+    private final List<Caba>     cabas;
+
+    public Escuela(String nombre, String codigo,
+                   LocalDate fechaCreacion, String director) {
+        super(nombre, codigo, fechaCreacion, director);
+        this.docentes = new ArrayList<>();
+        this.cabas    = new ArrayList<>();
+    }
+
+    @Override public String getTipo() { return "Escuela"; }
+
+    public boolean agregarDocente(Docente d) {
+        Objects.requireNonNull(d);
+        return !docentes.contains(d) && docentes.add(d);
+    }
+
+    public boolean agregarCaba(Caba c) {
+        Objects.requireNonNull(c);
+        return !cabas.contains(c) && cabas.add(c);
+    }
+
+    public List<Docente> getDocentes() {
+        return Collections.unmodifiableList(docentes);
+    }
+
+    public List<Caba> getCabas() {
+        return Collections.unmodifiableList(cabas);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Representa un Centro universitario con consejo y dirección propios
+ * (Art. 30, Acuerdo 004 de 2025).
+ */
+class Centro extends UnidadAcademica {
+    public Centro(String nombre, String codigo,
+                  LocalDate fechaCreacion, String director) {
+        super(nombre, codigo, fechaCreacion, director);
+    }
+    @Override public String getTipo() { return "Centro"; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Representa un Instituto universitario con consejo y dirección propios
+ * (Art. 32, Acuerdo 004 de 2025).
+ */
+class Instituto extends UnidadAcademica {
+    public Instituto(String nombre, String codigo,
+                     LocalDate fechaCreacion, String director) {
+        super(nombre, codigo, fechaCreacion, director);
+    }
+    @Override public String getTipo() { return "Instituto"; }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=javaStyle, caption={Clase \texttt{Caba} (Comité Académico Básico de Área)}, label={lst:caba}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.util.Objects;
+
+/**
+ * Comité Académico Básico de Área (CABA).
+ *
+ * <p>Los CABAS articulan las funciones de docencia e investigación
+ * al interior de cada Escuela, tal como lo dispone el Acuerdo 004 de 2025.
+ * Cada CABA pertenece a un área de formación y es coordinado por un
+ * docente designado por el Consejo de Escuela.</p>
+ */
+public class Caba {
+
+    private String areaFormacion;
+    private String coordinador;
+    private String nombre;
+
+    public Caba(String nombre, String areaFormacion, String coordinador) {
+        this.nombre        = Objects.requireNonNull(nombre);
+        this.areaFormacion = Objects.requireNonNull(areaFormacion);
+        this.coordinador   = coordinador;
+    }
+
+    public String getNombre()        { return nombre; }
+    public String getAreaFormacion() { return areaFormacion; }
+    public String getCoordinador()   { return coordinador; }
+
+    public void setAreaFormacion(String af) { this.areaFormacion = af; }
+    public void setCoordinador(String c)    { this.coordinador   = c; }
+
+    @Override
+    public String toString() {
+        return String.format("CABA[nombre=%s, area=%s, coordinador=%s]",
+                             nombre, areaFormacion, coordinador);
+    }
+}
+\end{lstlisting}
+
+\subsection{Clases de actores}
+\label{subsec:actores}
+
+La comunidad universitaria, definida en el artículo~8 del \acuerdo, comprende docentes,
+estudiantes, personal administrativo y egresados. Todos comparten atributos personales
+básicos encapsulados en la clase abstracta \texttt{Persona}, cuya herencia evita la
+duplicación de código y garantiza que todo actor del sistema sea identificable
+de manera unívoca.
+
+\begin{lstlisting}[style=javaStyle, caption={Clase abstracta \texttt{Persona} y enumeraciones de actor}, label={lst:persona}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.util.Objects;
+
+/**
+ * Clase abstracta que representa a cualquier persona vinculada
+ * a la Universidad Distrital Francisco José de Caldas.
+ *
+ * @author Roberto Albeiro Pava-Díaz
+ */
+public abstract class Persona {
+
+    private String nombre;
+    private String identificacion;
+    private String correo;
+
+    protected Persona(String nombre, String identificacion, String correo) {
+        this.nombre         = Objects.requireNonNull(nombre, "Nombre requerido.");
+        this.identificacion = Objects.requireNonNull(identificacion, "ID requerido.");
+        this.correo         = correo;
+    }
+
+    /** @return rol institucional de la persona (Docente, Estudiante, etc.) */
+    public abstract String getRol();
+
+    public String getNombre()         { return nombre; }
+    public void   setNombre(String n) { this.nombre = n; }
+
+    public String getIdentificacion()         { return identificacion; }
+    public void   setIdentificacion(String i) { this.identificacion = i; }
+
+    public String getCorreo()         { return correo; }
+    public void   setCorreo(String c) { this.correo = c; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Persona p)) return false;
+        return identificacion.equals(p.identificacion);
+    }
+
+    @Override public int hashCode() { return Objects.hash(identificacion); }
+
+    @Override
+    public String toString() {
+        return String.format("%s[id=%s, nombre=%s]", getRol(), identificacion, nombre);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tipos de vinculación docente según el Acuerdo 004 de 2025.
+ */
+enum TipoVinculacion {
+    /** Docente de planta con nombramiento permanente. */
+    PLANTA,
+    /** Docente ocasional con contrato a término definido. */
+    OCASIONAL,
+    /** Docente vinculado por hora cátedra. */
+    HORA_CATEDRA,
+    /** Docente visitante proveniente de otra institución. */
+    VISITANTE,
+    /** Experto o experta invitada del sector productivo. */
+    EXPERTO
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=javaStyle, caption={Clase \texttt{Docente} y \texttt{Estudiante}}, label={lst:docente-estudiante}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.util.Objects;
+
+/**
+ * Representa a un docente de la Universidad Distrital.
+ *
+ * <p>Los docentes se clasifican según su tipo de vinculación y están
+ * adscritos a una Escuela. La categoría docente (Auxiliar, Asistente,
+ * Asociado, Titular) aplica únicamente a los docentes de planta.</p>
+ */
+public class Docente extends Persona {
+
+    private TipoVinculacion tipoVinculacion;
+    private String           escuelaCodigo;
+    private String           categoria;
+
+    public Docente(String nombre, String identificacion, String correo,
+                   TipoVinculacion tipo, String escuelaCodigo, String categoria) {
+        super(nombre, identificacion, correo);
+        this.tipoVinculacion = Objects.requireNonNull(tipo);
+        this.escuelaCodigo   = escuelaCodigo;
+        this.categoria       = categoria;
+    }
+
+    @Override public String getRol() { return "Docente"; }
+
+    public TipoVinculacion getTipoVinculacion()         { return tipoVinculacion; }
+    public void            setTipoVinculacion(TipoVinculacion t) { this.tipoVinculacion = t; }
+
+    public String getEscuelaCodigo()          { return escuelaCodigo; }
+    public void   setEscuelaCodigo(String ec) { this.escuelaCodigo = ec; }
+
+    public String getCategoria()        { return categoria; }
+    public void   setCategoria(String c){ this.categoria = c; }
+
+    @Override
+    public String toString() {
+        return String.format("Docente[id=%s, nombre=%s, tipo=%s, escuela=%s]",
+                             getIdentificacion(), getNombre(),
+                             tipoVinculacion, escuelaCodigo);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Estado académico del estudiante a lo largo de su ciclo de vida institucional.
+ */
+enum EstadoEstudiante {
+    ASPIRANTE, ADMITIDO, ACTIVO, SUSPENDIDO, GRADUADO, RETIRADO
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Representa a un estudiante matriculado o con historia en la Universidad.
+ */
+public class Estudiante extends Persona {
+
+    private String          codigoEstudiantil;
+    private String          programaCodigo;
+    private int             semestre;
+    private EstadoEstudiante estado;
+
+    public Estudiante(String nombre, String identificacion, String correo,
+                      String codigoEstudiantil, String programaCodigo,
+                      int semestre, EstadoEstudiante estado) {
+        super(nombre, identificacion, correo);
+        this.codigoEstudiantil = Objects.requireNonNull(codigoEstudiantil);
+        this.programaCodigo    = programaCodigo;
+        this.semestre          = semestre;
+        this.estado            = estado;
+    }
+
+    @Override public String getRol() { return "Estudiante"; }
+
+    public String          getCodigoEstudiantil() { return codigoEstudiantil; }
+    public String          getProgramaCodigo()    { return programaCodigo; }
+    public int             getSemestre()          { return semestre; }
+    public EstadoEstudiante getEstado()           { return estado; }
+
+    public void setSemestre(int s)           { this.semestre = s; }
+    public void setEstado(EstadoEstudiante e){ this.estado   = e; }
+    public void setProgramaCodigo(String p)  { this.programaCodigo = p; }
+
+    @Override
+    public String toString() {
+        return String.format("Estudiante[cod=%s, nombre=%s, programa=%s, semestre=%d, estado=%s]",
+                             codigoEstudiantil, getNombre(), programaCodigo, semestre, estado);
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=javaStyle, caption={Clases \texttt{PersonalAdministrativo} y \texttt{Egresado}}, label={lst:admin-egresado}]
+package co.edu.udistrital.estatuto.modelo;
+
+/**
+ * Personal administrativo de la universidad (empleados públicos
+ * y trabajadores oficiales, según Art. 8, Acuerdo 004 de 2025).
+ */
+public class PersonalAdministrativo extends Persona {
+
+    private String cargo;
+    private String dependencia;
+
+    public PersonalAdministrativo(String nombre, String identificacion,
+                                   String correo, String cargo, String dependencia) {
+        super(nombre, identificacion, correo);
+        this.cargo       = cargo;
+        this.dependencia = dependencia;
+    }
+
+    @Override public String getRol() { return "PersonalAdministrativo"; }
+
+    public String getCargo()        { return cargo; }
+    public void   setCargo(String c){ this.cargo = c; }
+
+    public String getDependencia()         { return dependencia; }
+    public void   setDependencia(String d) { this.dependencia = d; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Egresado de la Universidad Distrital, integrante de la comunidad
+ * universitaria con derechos de participación conforme al Estatuto General.
+ */
+public class Egresado extends Persona {
+
+    private String programaGraduacion;
+    private int    anioGraduacion;
+    private String tituloObtenido;
+
+    public Egresado(String nombre, String identificacion, String correo,
+                    String programaGraduacion, int anioGraduacion, String titulo) {
+        super(nombre, identificacion, correo);
+        this.programaGraduacion = programaGraduacion;
+        this.anioGraduacion     = anioGraduacion;
+        this.tituloObtenido     = titulo;
+    }
+
+    @Override public String getRol() { return "Egresado"; }
+
+    public String getProgramaGraduacion()         { return programaGraduacion; }
+    public int    getAnioGraduacion()             { return anioGraduacion; }
+    public String getTituloObtenido()             { return tituloObtenido; }
+    public void   setTituloObtenido(String t)     { this.tituloObtenido = t; }
+}
+\end{lstlisting}
+
+\subsection{Clases de gestión académica}
+\label{subsec:gestion-academica}
+
+El subsistema de gestión académica modela los programas, planes de estudios y espacios
+académicos que conforman la oferta formativa de la universidad. Estos objetos exhiben
+una cadena de composición: una \texttt{Facultad} ofrece uno o más \texttt{ProgramaAcademico},
+cada uno de los cuales define un \texttt{PlanDeEstudios} que, a su vez, contiene
+múltiples \texttt{EspacioAcademico}. La \texttt{Matricula} vincula al \texttt{Estudiante}
+con el \texttt{ProgramaAcademico} en un periodo académico dado.
+
+\begin{lstlisting}[style=javaStyle, caption={Clases de gestión académica}, label={lst:gestion-academica}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.util.*;
+
+/** Nivel de formación de un programa académico. */
+enum NivelPrograma {
+    PREGRADO, ESPECIALIZACION, MAESTRIA, DOCTORADO
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Programa académico ofrecido por la Universidad Distrital.
+ *
+ * <p>Cada programa posee un código SNIES, un nivel de formación,
+ * una modalidad de oferta y un plan de estudios vigente.</p>
+ */
+public class ProgramaAcademico {
+
+    private String         nombre;
+    private String         codigo;
+    private NivelPrograma  nivel;
+    private String         modalidad;
+    private String         facultadCodigo;
+    private PlanDeEstudios planDeEstudios;
+
+    public ProgramaAcademico(String nombre, String codigo,
+                              NivelPrograma nivel, String modalidad,
+                              String facultadCodigo) {
+        this.nombre        = Objects.requireNonNull(nombre);
+        this.codigo        = Objects.requireNonNull(codigo);
+        this.nivel         = nivel;
+        this.modalidad     = modalidad;
+        this.facultadCodigo = facultadCodigo;
+    }
+
+    public String         getNombre()        { return nombre; }
+    public String         getCodigo()        { return codigo; }
+    public NivelPrograma  getNivel()         { return nivel; }
+    public String         getModalidad()     { return modalidad; }
+    public String         getFacultadCodigo(){ return facultadCodigo; }
+    public PlanDeEstudios getPlanDeEstudios(){ return planDeEstudios; }
+
+    public void setPlanDeEstudios(PlanDeEstudios p) { this.planDeEstudios = p; }
+    public void setNivel(NivelPrograma n)            { this.nivel          = n; }
+    public void setModalidad(String m)              { this.modalidad      = m; }
+
+    @Override
+    public String toString() {
+        return String.format("Programa[%s - %s, nivel=%s]", codigo, nombre, nivel);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Plan de estudios de un programa académico.
+ * Contiene la versión vigente, los créditos totales y la lista
+ * de espacios académicos que lo componen.
+ */
+public class PlanDeEstudios {
+
+    private String                  version;
+    private int                     creditosTotales;
+    private final List<EspacioAcademico> espacios;
+
+    public PlanDeEstudios(String version, int creditosTotales) {
+        this.version        = Objects.requireNonNull(version);
+        this.creditosTotales = creditosTotales;
+        this.espacios       = new ArrayList<>();
+    }
+
+    public boolean agregarEspacio(EspacioAcademico ea) {
+        Objects.requireNonNull(ea);
+        return espacios.add(ea);
+    }
+
+    public String  getVersion()        { return version; }
+    public int     getCreditosTotales(){ return creditosTotales; }
+
+    public List<EspacioAcademico> getEspacios() {
+        return Collections.unmodifiableList(espacios);
+    }
+
+    /** Suma real de créditos de los espacios registrados. */
+    public int calcularCreditosAcumulados() {
+        return espacios.stream().mapToInt(EspacioAcademico::getCreditos).sum();
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Espacio académico (asignatura o componente) del plan de estudios.
+ */
+public class EspacioAcademico {
+
+    private String nombre;
+    private String codigo;
+    private int    creditos;
+    private String tipo;          // p.ej. "Obligatorio", "Electivo"
+    private int    horasTeoricas;
+    private int    horasPracticas;
+
+    public EspacioAcademico(String nombre, String codigo, int creditos,
+                             String tipo, int horasTeoricas, int horasPracticas) {
+        this.nombre        = Objects.requireNonNull(nombre);
+        this.codigo        = Objects.requireNonNull(codigo);
+        this.creditos      = creditos;
+        this.tipo          = tipo;
+        this.horasTeoricas = horasTeoricas;
+        this.horasPracticas = horasPracticas;
+    }
+
+    public String getNombre()        { return nombre; }
+    public String getCodigo()        { return codigo; }
+    public int    getCreditos()      { return creditos; }
+    public String getTipo()          { return tipo; }
+    public int    getHorasTeoricas() { return horasTeoricas; }
+    public int    getHorasPracticas(){ return horasPracticas; }
+    public int    getHorasTotales()  { return horasTeoricas + horasPracticas; }
+
+    @Override
+    public String toString() {
+        return String.format("Espacio[%s - %s, creditos=%d]", codigo, nombre, creditos);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Matrícula que vincula a un Estudiante con un ProgramaAcademico
+ * en un periodo académico determinado.
+ */
+public class Matricula {
+
+    private String           estudianteId;
+    private String           programaCodigo;
+    private String           periodo;    // p.ej. "2025-2"
+    private EstadoEstudiante estado;
+    private double           valorPagado;
+
+    public Matricula(String estudianteId, String programaCodigo,
+                     String periodo, EstadoEstudiante estado) {
+        this.estudianteId  = Objects.requireNonNull(estudianteId);
+        this.programaCodigo = Objects.requireNonNull(programaCodigo);
+        this.periodo       = Objects.requireNonNull(periodo);
+        this.estado        = estado;
+    }
+
+    public String          getEstudianteId()        { return estudianteId; }
+    public String          getProgramaCodigo()      { return programaCodigo; }
+    public String          getPeriodo()             { return periodo; }
+    public EstadoEstudiante getEstado()             { return estado; }
+    public double          getValorPagado()         { return valorPagado; }
+
+    public void setEstado(EstadoEstudiante e)       { this.estado      = e; }
+    public void setValorPagado(double v)            { this.valorPagado = v; }
+
+    @Override
+    public String toString() {
+        return String.format("Matricula[estudiante=%s, programa=%s, periodo=%s, estado=%s]",
+                             estudianteId, programaCodigo, periodo, estado);
+    }
+}
+\end{lstlisting}
+
+\subsection{Clases de evaluación}
+\label{subsec:evaluacion}
+
+El sistema de evaluación formativa constituye el núcleo pedagógico del modelo.
+Los Resultados de Aprendizaje (RA), articulados con el Decreto~1330 de 2019 y el
+Acuerdo~02 de 2020 del CESU, se asocian a rúbricas con criterios ponderados y
+niveles de dominio explícitos. Esta estructura permite que las evidencias de aprendizaje
+sean registradas y calificadas de manera trazable.
+
+\begin{lstlisting}[style=javaStyle, caption={Clases de evaluación formativa}, label={lst:evaluacion}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.time.LocalDate;
+import java.util.*;
+
+/**
+ * Resultado de Aprendizaje (RA) asociado a un Programa Académico.
+ *
+ * <p>Formulado con verbos de acción observables (Taxonomía de Bloom)
+ * y articulado con el perfil de egreso del programa.</p>
+ */
+public class ResultadoDeAprendizaje {
+
+    private String descripcion;
+    private String nivelDominio;   // Básico, Intermedio, Avanzado
+    private String programaCodigo;
+
+    public ResultadoDeAprendizaje(String descripcion, String nivelDominio,
+                                   String programaCodigo) {
+        this.descripcion   = Objects.requireNonNull(descripcion);
+        this.nivelDominio  = nivelDominio;
+        this.programaCodigo = programaCodigo;
+    }
+
+    public String getDescripcion()    { return descripcion; }
+    public String getNivelDominio()   { return nivelDominio; }
+    public String getProgramaCodigo() { return programaCodigo; }
+
+    public void setNivelDominio(String n)  { this.nivelDominio = n; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Rúbrica de evaluación con criterios y niveles de desempeño.
+ */
+public class Rubrica {
+
+    private String                    nombre;
+    private final List<CriterioRubrica> criterios;
+    private final List<String>        niveles;  // p.ej. ["Deficiente","Aceptable","Sobresaliente"]
+
+    public Rubrica(String nombre, List<String> niveles) {
+        this.nombre    = Objects.requireNonNull(nombre);
+        this.niveles   = new ArrayList<>(Objects.requireNonNull(niveles));
+        this.criterios = new ArrayList<>();
+    }
+
+    public boolean agregarCriterio(CriterioRubrica c) {
+        return criterios.add(Objects.requireNonNull(c));
+    }
+
+    public String              getNombre()   { return nombre; }
+    public List<String>        getNiveles()  { return Collections.unmodifiableList(niveles); }
+    public List<CriterioRubrica> getCriterios() {
+        return Collections.unmodifiableList(criterios);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Criterio individual dentro de una rúbrica, con descriptores por nivel.
+ */
+public class CriterioRubrica {
+
+    private String              nombre;
+    private double              ponderacion;   // valor entre 0 y 1
+    private final Map<String, String> descriptores; // nivel -> descriptor textual
+
+    public CriterioRubrica(String nombre, double ponderacion) {
+        if (ponderacion < 0 || ponderacion > 1)
+            throw new IllegalArgumentException("La ponderación debe estar entre 0 y 1.");
+        this.nombre       = nombre;
+        this.ponderacion  = ponderacion;
+        this.descriptores = new LinkedHashMap<>();
+    }
+
+    public void agregarDescriptor(String nivel, String descriptor) {
+        descriptores.put(nivel, descriptor);
+    }
+
+    public String  getNombre()      { return nombre; }
+    public double  getPonderacion() { return ponderacion; }
+    public Map<String, String> getDescriptores() {
+        return Collections.unmodifiableMap(descriptores);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Evidencia de aprendizaje registrada por un estudiante.
+ */
+public class Evidencia {
+
+    private String      tipo;          // Tarea, Proyecto, Examen, etc.
+    private String      descripcion;
+    private LocalDate   fecha;
+    private double      calificacion;  // 0.0 - 5.0
+
+    public Evidencia(String tipo, String descripcion,
+                     LocalDate fecha, double calificacion) {
+        this.tipo          = tipo;
+        this.descripcion   = descripcion;
+        this.fecha         = fecha;
+        setCalificacion(calificacion);
+    }
+
+    public void setCalificacion(double c) {
+        if (c < 0.0 || c > 5.0)
+            throw new IllegalArgumentException(
+                "La calificación debe estar entre 0.0 y 5.0.");
+        this.calificacion = c;
+    }
+
+    public String    getTipo()          { return tipo; }
+    public String    getDescripcion()   { return descripcion; }
+    public LocalDate getFecha()         { return fecha; }
+    public double    getCalificacion()  { return calificacion; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Propósito de Formación y Aprendizaje (PFA) en uno de los tres ámbitos
+ * definidos por la Universidad Distrital (2023): ontológico, epistemológico,
+ * contextual.
+ */
+public class PropositoFormacion {
+
+    public enum Ambito { ONTOLOGICO, EPISTEMOLOGICO, CONTEXTUAL }
+
+    private Ambito ambito;
+    private String descripcion;
+    private String programaCodigo;
+
+    public PropositoFormacion(Ambito ambito, String descripcion, String programaCodigo) {
+        this.ambito        = Objects.requireNonNull(ambito);
+        this.descripcion   = Objects.requireNonNull(descripcion);
+        this.programaCodigo = programaCodigo;
+    }
+
+    public Ambito getAmbito()         { return ambito; }
+    public String getDescripcion()    { return descripcion; }
+    public String getProgramaCodigo() { return programaCodigo; }
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Interfaces y clases abstractas}
+\label{sec:java-interfaces}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+Las interfaces en \java\ cumplen un rol dual en este sistema: por un lado, contratan
+el comportamiento que las clases deben exhibir; por otro, habilitan el polimorfismo
+sin imponer la restricción de herencia única. Se definen tres interfaces transversales
+cuya influencia se extiende a lo largo de todo el sistema.
+
+\begin{lstlisting}[style=javaStyle, caption={Interfaces \texttt{Gestionable}, \texttt{Evaluable} y \texttt{Exportable}}, label={lst:interfaces}]
+package co.edu.udistrital.estatuto.modelo;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Contrato genérico para operaciones CRUD sobre entidades del dominio.
+ *
+ * @param <T>  tipo de la entidad gestionada
+ * @param <ID> tipo del identificador (String para códigos institucionales)
+ */
+public interface Gestionable<T, ID> {
+
+    /**
+     * Registra una nueva entidad en el sistema.
+     * @param entidad entidad a registrar
+     * @return entidad registrada (puede incluir ID generado)
+     */
+    T crear(T entidad);
+
+    /**
+     * Recupera una entidad por su identificador.
+     * @param id identificador de la entidad
+     * @return {@link Optional} con la entidad, o vacío si no existe
+     */
+    Optional<T> buscarPorId(ID id);
+
+    /**
+     * Retorna todas las entidades del tipo gestionado.
+     * @return lista inmutable de entidades
+     */
+    List<T> listarTodos();
+
+    /**
+     * Actualiza los datos de una entidad existente.
+     * @param entidad entidad con datos actualizados
+     * @return entidad actualizada
+     */
+    T actualizar(T entidad);
+
+    /**
+     * Elimina una entidad por su identificador.
+     * @param id identificador de la entidad a eliminar
+     * @return {@code true} si la eliminación fue exitosa
+     */
+    boolean eliminar(ID id);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Contrato para entidades sujetas a evaluación con rúbricas.
+ */
+public interface Evaluable {
+
+    /**
+     * Evalúa la entidad usando la rúbrica proporcionada.
+     * @param rubrica rúbrica de evaluación
+     * @return calificación resultante en escala 0.0 - 5.0
+     */
+    double evaluar(Rubrica rubrica);
+
+    /**
+     * Retorna las evidencias asociadas a esta entidad.
+     * @return lista de evidencias registradas
+     */
+    List<Evidencia> getEvidencias();
+
+    /**
+     * Determina si la entidad alcanza el umbral mínimo de aprobación.
+     * @param umbral calificación mínima requerida
+     * @return {@code true} si supera o iguala el umbral
+     */
+    default boolean aprueba(double umbral) {
+        return evaluar(null) >= umbral;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Contrato para entidades que pueden exportarse como reporte.
+ */
+public interface Exportable {
+
+    /**
+     * Exporta la representación de la entidad en el formato especificado.
+     * @param formato "JSON", "CSV", "PDF", "XML"
+     * @return cadena con la representación exportada
+     */
+    String exportar(String formato);
+
+    /**
+     * Genera el encabezado de columnas para exportación tabular.
+     * @return arreglo con los nombres de las columnas
+     */
+    String[] getEncabezados();
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Herencia, polimorfismo y encapsulamiento}
+\label{sec:java-poo-pilares}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+Los tres pilares de la \poo\ se manifiestan con nitidez en el diseño del sistema.
+El polimorfismo emerge de manera natural cuando el código cliente opera sobre
+referencias de tipo \texttt{UnidadAcademica} sin conocer el tipo concreto de la
+instancia; el encapsulamiento protege la integridad del estado de los objetos
+mediante validaciones en los mutadores; la herencia estructura la jerarquía de
+entidades evitando la duplicación de código.
+
+\begin{lstlisting}[style=javaStyle, caption={Ejemplo de polimorfismo con \texttt{UnidadAcademica}}, label={lst:polimorfismo}]
+package co.edu.udistrital.estatuto.util;
+
+import co.edu.udistrital.estatuto.modelo.*;
+import java.util.List;
+
+/**
+ * Demostración de uso polimórfico de UnidadAcademica.
+ * El método imprimirInfo() opera sobre cualquier subclase
+ * sin requerir instanceof ni castings explícitos.
+ */
+public class DemoPolimorfismo {
+
+    /**
+     * Imprime la información básica de cada unidad académica.
+     * El método getTipo() se resuelve en tiempo de ejecución
+     * (despacho dinámico / virtual dispatch).
+     *
+     * @param unidades lista heterogénea de unidades académicas
+     */
+    public static void imprimirResumen(List<UnidadAcademica> unidades) {
+        for (UnidadAcademica ua : unidades) {
+            // getTipo() retorna "Facultad", "Escuela", "Centro" o "Instituto"
+            // según el tipo concreto, sin que este método lo conozca.
+            System.out.printf("%-12s | %-8s | %s%n",
+                              ua.getTipo(), ua.getCodigo(), ua.getNombre());
+        }
+    }
+
+    /** Ejemplo de encapsulamiento con validación en setter. */
+    public static void demoEncapsulamiento() {
+        Facultad f = new Facultad("Ingeniería", "FI",
+                                  java.time.LocalDate.of(1950, 1, 1),
+                                  "Dir. General", "Dr. Ejemplo");
+        try {
+            f.setCodigo("");            // Lanza IllegalArgumentException
+        } catch (IllegalArgumentException ex) {
+            System.out.println("Validación activa: " + ex.getMessage());
+        }
+        f.setCodigo("FI-001");          // Código válido: normalizado a mayúsculas
+        System.out.println("Código actualizado: " + f.getCodigo());
+    }
+
+    public static void main(String[] args) {
+        List<UnidadAcademica> unidades = List.of(
+            new Facultad("Ingeniería",  "FI",  java.time.LocalDate.of(1950,1,1), "D1","D2"),
+            new Escuela("Ing. Sistemas","EIS", java.time.LocalDate.of(1970,1,1), "D3"),
+            new Centro("CIDC",          "CID", java.time.LocalDate.of(1995,1,1), "D4")
+        );
+        imprimirResumen(unidades);
+        demoEncapsulamiento();
+    }
+}
+\end{lstlisting}
+
+\noindent
+La salida del método \texttt{imprimirResumen} evidencia el polimorfismo en acción:
+la misma instrucción \texttt{ua.getTipo()} retorna cadenas distintas
+---\texttt{"Facultad"}, \texttt{"Escuela"}, \texttt{"Centro"}--- según el tipo
+concreto de cada objeto. No hay condicionales; el compilador y la JVM resuelven el
+método correcto en tiempo de ejecución mediante el mecanismo de despacho dinámico.
+Esto es, precisamente, lo que distingue a la orientación a objetos del paradigma
+procedural: el \textit{qué hacer} se delega al objeto mismo.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Patrones de diseño}
+\label{sec:java-patrones}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+Los patrones de diseño ---catálogo sistematizado por \textcite{Gamma1994}--- ofrecen
+soluciones recurrentes a problemas recurrentes de diseño orientado a objetos. Se
+implementan tres patrones que responden a necesidades concretas del dominio
+estatutario: Factory Method, Strategy y Observer.
+
+\subsection{Factory Method: creación de unidades académicas}
+
+El patrón Factory Method desacopla la creación de objetos de su tipo concreto.
+En este sistema, la \texttt{UnidadAcademicaFactory} centraliza la instanciación
+de Facultades, Escuelas, Centros e Institutos, evitando que el código cliente
+use constructores directamente y facilitando la extensión del sistema con nuevos
+tipos de unidad sin modificar el código existente.\footnote{Este comportamiento
+corresponde al principio Abierto/Cerrado (OCP) de SOLID: el sistema está abierto
+a la extensión (nuevos tipos de unidad) pero cerrado a la modificación del código cliente.}
+
+\begin{lstlisting}[style=javaStyle, caption={Factory Method para \texttt{UnidadAcademica}}, label={lst:factory}]
+package co.edu.udistrital.estatuto.patron;
+
+import co.edu.udistrital.estatuto.modelo.*;
+import java.time.LocalDate;
+
+/**
+ * Factory Method para la creación de unidades académicas.
+ *
+ * <p>Centraliza la instanciación y permite incorporar lógica de
+ * inicialización compartida (p. ej., auditoría, logging) sin duplicar
+ * código en cada punto de creación.</p>
+ */
+public class UnidadAcademicaFactory {
+
+    public enum TipoUnidad { FACULTAD, ESCUELA, CENTRO, INSTITUTO }
+
+    /**
+     * Crea una unidad académica del tipo especificado.
+     *
+     * @param tipo          tipo de unidad a crear
+     * @param nombre        nombre oficial
+     * @param codigo        código institucional
+     * @param fechaCreacion fecha de creación
+     * @param director      nombre del director
+     * @return instancia concreta de {@link UnidadAcademica}
+     * @throws IllegalArgumentException si el tipo no es reconocido
+     */
+    public static UnidadAcademica crear(TipoUnidad tipo,
+                                        String nombre, String codigo,
+                                        LocalDate fechaCreacion, String director) {
+        return switch (tipo) {
+            case FACULTAD  -> new Facultad(nombre, codigo, fechaCreacion,
+                                           director, director);
+            case ESCUELA   -> new Escuela(nombre, codigo, fechaCreacion, director);
+            case CENTRO    -> new Centro(nombre, codigo, fechaCreacion, director);
+            case INSTITUTO -> new Instituto(nombre, codigo, fechaCreacion, director);
+        };
+    }
+
+    // Ejemplo de uso
+    public static void main(String[] args) {
+        UnidadAcademica fi = UnidadAcademicaFactory.crear(
+            TipoUnidad.FACULTAD, "Facultad de Ingeniería",
+            "FI", LocalDate.of(1950, 1, 1), "Decano Ejemplo");
+
+        UnidadAcademica eis = UnidadAcademicaFactory.crear(
+            TipoUnidad.ESCUELA, "Escuela de Ingeniería de Sistemas",
+            "EIS", LocalDate.of(1970, 6, 15), "Director Ejemplo");
+
+        System.out.println(fi);
+        System.out.println(eis);
+    }
+}
+\end{lstlisting}
+
+\subsection{Strategy: algoritmos de evaluación intercambiables}
+
+El patrón Strategy encapsula algoritmos alternativos detrás de una interfaz común,
+permitiendo seleccionar el algoritmo en tiempo de ejecución. En el contexto del
+sistema de evaluación, distintos programas académicos pueden requerir estrategias
+de cálculo de nota final disímiles: promedio aritmético, promedio ponderado por
+créditos, o escala de suficiencia/proficiencia.
+
+\begin{lstlisting}[style=javaStyle, caption={Strategy para algoritmos de evaluación}, label={lst:strategy}]
+package co.edu.udistrital.estatuto.patron;
+
+import co.edu.udistrital.estatuto.modelo.Evidencia;
+import java.util.List;
+
+/**
+ * Interfaz Strategy para el cálculo de nota final a partir
+ * de un conjunto de evidencias de aprendizaje.
+ */
+public interface EvaluacionStrategy {
+
+    /**
+     * Calcula la nota final con base en las evidencias proporcionadas.
+     *
+     * @param evidencias lista de evidencias con sus calificaciones individuales
+     * @return nota final en escala 0.0 - 5.0
+     */
+    double calcularNotaFinal(List<Evidencia> evidencias);
+
+    /** Nombre descriptivo de la estrategia (para reportes). */
+    String getNombreEstrategia();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Estrategia 1: promedio aritmético simple. */
+class PromedioAritmeticoStrategy implements EvaluacionStrategy {
+
+    @Override
+    public double calcularNotaFinal(List<Evidencia> evidencias) {
+        if (evidencias == null || evidencias.isEmpty()) return 0.0;
+        return evidencias.stream()
+                         .mapToDouble(Evidencia::getCalificacion)
+                         .average()
+                         .orElse(0.0);
+    }
+
+    @Override
+    public String getNombreEstrategia() { return "Promedio Aritmético"; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Estrategia 2: nota mínima de tres (nota más baja de todas las evidencias). */
+class NotaMinimaStrategy implements EvaluacionStrategy {
+
+    @Override
+    public double calcularNotaFinal(List<Evidencia> evidencias) {
+        if (evidencias == null || evidencias.isEmpty()) return 0.0;
+        return evidencias.stream()
+                         .mapToDouble(Evidencia::getCalificacion)
+                         .min()
+                         .orElse(0.0);
+    }
+
+    @Override
+    public String getNombreEstrategia() { return "Nota Mínima"; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Contexto que utiliza la estrategia de evaluación.
+ * Permite cambiar la estrategia en tiempo de ejecución.
+ */
+class CalculadorDeNota {
+
+    private EvaluacionStrategy estrategia;
+
+    public CalculadorDeNota(EvaluacionStrategy estrategia) {
+        this.estrategia = estrategia;
+    }
+
+    /** Cambia la estrategia sin modificar el contexto. */
+    public void setEstrategia(EvaluacionStrategy nueva) {
+        this.estrategia = nueva;
+    }
+
+    public double calcular(List<Evidencia> evidencias) {
+        return estrategia.calcularNotaFinal(evidencias);
+    }
+
+    public void imprimirResultado(List<Evidencia> evidencias) {
+        System.out.printf("Estrategia: %-25s | Nota: %.2f%n",
+                          estrategia.getNombreEstrategia(),
+                          calcular(evidencias));
+    }
+}
+\end{lstlisting}
+
+\subsection{Observer: notificaciones del Consejo}
+
+El patrón Observer implementa una dependencia uno-a-muchos entre objetos: cuando
+el estado del sujeto cambia, todos sus observadores son notificados automáticamente.
+En el sistema estatutario, el Consejo de Facultad actúa como sujeto observable;
+los interesados en sus decisiones ---sistemas de notificación, módulos de auditoría---
+se suscriben como observadores.
+
+\begin{lstlisting}[style=javaStyle, caption={Observer para notificaciones del Consejo}, label={lst:observer}]
+package co.edu.udistrital.estatuto.patron;
+
+import java.util.*;
+
+/**
+ * Interface Observer: observador de eventos del Consejo.
+ */
+public interface ConsejoObserver {
+    /**
+     * Notifica al observador sobre un evento del Consejo.
+     * @param evento     descripción del evento ocurrido
+     * @param consejo    nombre del consejo que generó el evento
+     */
+    void actualizar(String evento, String consejo);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Consejo observable: notifica a todos los observadores suscritos
+ * cuando se registra un nuevo acuerdo o decisión.
+ */
+class ConsejoObservable {
+
+    private final String              nombre;
+    private final List<ConsejoObserver> observadores;
+    private String                    ultimoAcuerdo;
+
+    public ConsejoObservable(String nombre) {
+        this.nombre       = nombre;
+        this.observadores = new ArrayList<>();
+    }
+
+    /** Suscribe un nuevo observador. */
+    public void suscribir(ConsejoObserver obs) {
+        observadores.add(Objects.requireNonNull(obs));
+    }
+
+    /** Cancela la suscripción de un observador. */
+    public void desuscribir(ConsejoObserver obs) {
+        observadores.remove(obs);
+    }
+
+    /**
+     * Registra un nuevo acuerdo y notifica a todos los observadores.
+     * @param acuerdo texto del acuerdo aprobado
+     */
+    public void registrarAcuerdo(String acuerdo) {
+        this.ultimoAcuerdo = acuerdo;
+        notificar("ACUERDO_APROBADO: " + acuerdo);
+    }
+
+    private void notificar(String evento) {
+        for (ConsejoObserver obs : observadores) {
+            obs.actualizar(evento, nombre);
+        }
+    }
+
+    public String getUltimoAcuerdo() { return ultimoAcuerdo; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Observador concreto: módulo de auditoría. */
+class AuditoriaObserver implements ConsejoObserver {
+    private final List<String> bitacora = new ArrayList<>();
+
+    @Override
+    public void actualizar(String evento, String consejo) {
+        String registro = String.format("[AUDITORIA] %s - Consejo: %s", evento, consejo);
+        bitacora.add(registro);
+        System.out.println(registro);
+    }
+
+    public List<String> getBitacora() {
+        return Collections.unmodifiableList(bitacora);
+    }
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Manejo de excepciones}
+\label{sec:java-excepciones}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+El manejo estructurado de excepciones constituye un aspecto crítico de los sistemas
+de información institucional, donde la corrupción silenciosa de datos puede tener
+consecuencias administrativas y legales. Se define una jerarquía de excepciones
+encabezada por \texttt{EstatutoException}, clase verificada (\textit{checked}) que
+obliga a los clientes del sistema a tratar explícitamente los errores del dominio.
+
+\begin{lstlisting}[style=javaStyle, caption={Jerarquía de excepciones del sistema}, label={lst:excepciones}]
+package co.edu.udistrital.estatuto.excepcion;
+
+/**
+ * Excepción raíz del sistema de información estatutario.
+ * Todas las excepciones de negocio heredan de esta clase.
+ */
+public class EstatutoException extends Exception {
+
+    private final String codigoError;
+
+    public EstatutoException(String mensaje, String codigoError) {
+        super(mensaje);
+        this.codigoError = codigoError;
+    }
+
+    public EstatutoException(String mensaje, String codigoError, Throwable causa) {
+        super(mensaje, causa);
+        this.codigoError = codigoError;
+    }
+
+    public String getCodigoError() { return codigoError; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Excepción lanzada cuando una operación de matrícula es inválida.
+ * Ejemplos: matrícula en programa cerrado, doble matrícula, saldo pendiente.
+ */
+class MatriculaException extends EstatutoException {
+
+    public MatriculaException(String mensaje) {
+        super(mensaje, "MAT-001");
+    }
+
+    public MatriculaException(String mensaje, String codigo) {
+        super(mensaje, codigo);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Excepción lanzada cuando una operación de evaluación es inválida.
+ */
+class EvaluacionException extends EstatutoException {
+
+    public EvaluacionException(String mensaje) {
+        super(mensaje, "EVA-001");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Excepción lanzada cuando una entidad buscada no existe en el sistema.
+ */
+class EntidadNoEncontradaException extends EstatutoException {
+
+    private final String tipo;
+    private final String id;
+
+    public EntidadNoEncontradaException(String tipo, String id) {
+        super(String.format("No se encontró %s con identificador '%s'.", tipo, id),
+              "ENT-404");
+        this.tipo = tipo;
+        this.id   = id;
+    }
+
+    public String getTipoEntidad() { return tipo; }
+    public String getIdBuscado()   { return id; }
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Interfaz gráfica con JavaFX}
+\label{sec:java-javafx}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+La interfaz gráfica del sistema adopta una estructura de tres niveles: una barra
+de menú (\texttt{MenuBar}) para las operaciones globales, un panel de pestañas
+(\texttt{TabPane}) para gestionar las entidades del dominio (Facultades, Docentes,
+Estudiantes, Programas) y, dentro de cada pestaña, una tabla de resultados
+(\texttt{TableView}) con botones CRUD. Esta estructura refleja el patrón MVC:
+las vistas delegan toda la lógica en el controlador y no acceden directamente
+al modelo de datos.
+
+\begin{lstlisting}[style=javaStyle, caption={Vista principal con JavaFX}, label={lst:javafx-vista}]
+package co.edu.udistrital.estatuto.vista;
+
+import co.edu.udistrital.estatuto.controlador.FacultadControlador;
+import co.edu.udistrital.estatuto.modelo.Facultad;
+import javafx.application.Application;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+
+/**
+ * Vista principal de la aplicación JavaFX.
+ *
+ * <p>Organiza la interfaz en un TabPane con pestañas para cada
+ * entidad principal del dominio. La pestaña de Facultades se
+ * implementa de forma completa; las demás siguen el mismo patrón.</p>
+ */
+public class VistaPrincipal extends Application {
+
+    private final FacultadControlador ctrlFacultad = new FacultadControlador();
+
+    @Override
+    public void start(Stage stage) {
+        BorderPane raiz = new BorderPane();
+
+        // ── Barra de menú ───────────────────────────────────────────────────
+        MenuBar menuBar = crearMenuBar(stage);
+        raiz.setTop(menuBar);
+
+        // ── Panel de pestañas ───────────────────────────────────────────────
+        TabPane tabPane = new TabPane();
+        tabPane.getTabs().addAll(
+            crearPestaniaFacultades(),
+            crearPestaniaPlaceholder("Docentes"),
+            crearPestaniaPlaceholder("Estudiantes"),
+            crearPestaniaPlaceholder("Programas")
+        );
+        raiz.setCenter(tabPane);
+
+        Scene escena = new Scene(raiz, 1024, 700);
+        stage.setTitle("Sistema de Información Estatutario — Universidad Distrital");
+        stage.setScene(escena);
+        stage.show();
+    }
+
+    // ── Menú principal ──────────────────────────────────────────────────────
+
+    private MenuBar crearMenuBar(Stage stage) {
+        Menu menuArchivo = new Menu("Archivo");
+        MenuItem miSalir = new MenuItem("Salir");
+        miSalir.setOnAction(e -> stage.close());
+        menuArchivo.getItems().add(miSalir);
+
+        Menu menuAyuda = new Menu("Ayuda");
+        MenuItem miAcerca = new MenuItem("Acerca de...");
+        miAcerca.setOnAction(e -> mostrarDialogoAcerca());
+        menuAyuda.getItems().add(miAcerca);
+
+        return new MenuBar(menuArchivo, menuAyuda);
+    }
+
+    // ── Pestaña de Facultades ───────────────────────────────────────────────
+
+    private Tab crearPestaniaFacultades() {
+        Tab tab = new Tab("Facultades");
+        tab.setClosable(false);
+
+        // Tabla de Facultades
+        TableView<Facultad> tabla = new TableView<>();
+        ObservableList<Facultad> datos = FXCollections.observableArrayList(
+            ctrlFacultad.listarTodos()
+        );
+        tabla.setItems(datos);
+
+        TableColumn<Facultad, String> colCodigo = new TableColumn<>("Código");
+        colCodigo.setCellValueFactory(
+            c -> new SimpleStringProperty(c.getValue().getCodigo()));
+
+        TableColumn<Facultad, String> colNombre = new TableColumn<>("Nombre");
+        colNombre.setCellValueFactory(
+            c -> new SimpleStringProperty(c.getValue().getNombre()));
+
+        TableColumn<Facultad, String> colDecano = new TableColumn<>("Decano/a");
+        colDecano.setCellValueFactory(
+            c -> new SimpleStringProperty(c.getValue().getDecano()));
+
+        tabla.getColumns().addAll(colCodigo, colNombre, colDecano);
+
+        // Botones CRUD
+        Button btnNuevo    = new Button("Nueva Facultad");
+        Button btnEditar   = new Button("Editar");
+        Button btnEliminar = new Button("Eliminar");
+
+        btnNuevo.setOnAction(e -> mostrarFormularioFacultad(null, datos));
+        btnEditar.setOnAction(e -> {
+            Facultad sel = tabla.getSelectionModel().getSelectedItem();
+            if (sel != null) mostrarFormularioFacultad(sel, datos);
+        });
+        btnEliminar.setOnAction(e -> {
+            Facultad sel = tabla.getSelectionModel().getSelectedItem();
+            if (sel != null && ctrlFacultad.eliminar(sel.getCodigo())) {
+                datos.remove(sel);
+            }
+        });
+
+        HBox botones = new HBox(8, btnNuevo, btnEditar, btnEliminar);
+        VBox contenido = new VBox(8, tabla, botones);
+        contenido.setPadding(new javafx.geometry.Insets(10));
+        tab.setContent(contenido);
+        return tab;
+    }
+
+    private Tab crearPestaniaPlaceholder(String nombre) {
+        Tab tab = new Tab(nombre);
+        tab.setClosable(false);
+        tab.setContent(new Label("Sección " + nombre + " — en construcción"));
+        return tab;
+    }
+
+    private void mostrarFormularioFacultad(Facultad f,
+                                            ObservableList<Facultad> datos) {
+        Dialog<Facultad> dialog = new Dialog<>();
+        dialog.setTitle(f == null ? "Nueva Facultad" : "Editar Facultad");
+        TextField tfCodigo  = new TextField(f != null ? f.getCodigo()  : "");
+        TextField tfNombre  = new TextField(f != null ? f.getNombre()  : "");
+        TextField tfDecano  = new TextField(f != null ? f.getDecano()  : "");
+        GridPane grid = new GridPane();
+        grid.setHgap(8); grid.setVgap(8);
+        grid.addRow(0, new Label("Código:"), tfCodigo);
+        grid.addRow(1, new Label("Nombre:"), tfNombre);
+        grid.addRow(2, new Label("Decano/a:"), tfDecano);
+        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().getButtonTypes().addAll(
+            ButtonType.OK, ButtonType.CANCEL);
+        dialog.setResultConverter(bt -> {
+            if (bt == ButtonType.OK) {
+                // Aquí se invoca el controlador, no el modelo directamente
+                return ctrlFacultad.crearOActualizar(
+                    tfCodigo.getText(), tfNombre.getText(), tfDecano.getText());
+            }
+            return null;
+        });
+        dialog.showAndWait().ifPresent(nueva -> {
+            if (!datos.contains(nueva)) datos.add(nueva);
+        });
+    }
+
+    private void mostrarDialogoAcerca() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Acerca de");
+        alert.setHeaderText("Sistema de Información Estatutario");
+        alert.setContentText("Desarrollado como caso de estudio del libro POO.\n"
+                           + "Universidad Distrital Francisco José de Caldas, 2026.");
+        alert.showAndWait();
+    }
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Persistencia de datos}
+\label{sec:java-persistencia}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+La persistencia se implementa mediante el patrón DAO (\textit{Data Access Object}),
+que desacopla la lógica de acceso a datos de las clases de dominio. Los objetos se
+serializan a formato JSON utilizando la biblioteca Gson, cuya simplicidad la hace
+apropiada para el alcance de este proyecto de enseñanza.\footnote{En sistemas de
+producción se preferiría un ORM como Hibernate o un cliente JPA. Para los propósitos
+pedagógicos de este libro, la serialización JSON con Gson ofrece la virtud de la
+transparencia: el estudiante puede abrir el archivo resultante y verificar su contenido
+sin herramientas adicionales.}
+
+\begin{lstlisting}[style=javaStyle, caption={Interfaz \texttt{GenericDAO} y clase \texttt{JsonDAO}}, label={lst:dao}]
+package co.edu.udistrital.estatuto.persistencia;
+
+import com.google.gson.*;
+import com.google.gson.reflect.TypeToken;
+import java.io.*;
+import java.lang.reflect.Type;
+import java.nio.file.*;
+import java.util.*;
+
+/**
+ * Interfaz genérica para operaciones de acceso a datos.
+ *
+ * @param <T>  tipo de la entidad
+ * @param <ID> tipo del identificador
+ */
+public interface GenericDAO<T, ID> {
+    void       guardar(T entidad)    throws IOException;
+    Optional<T> buscarPorId(ID id)  throws IOException;
+    List<T>    buscarTodos()         throws IOException;
+    void       actualizar(T entidad) throws IOException;
+    boolean    eliminar(ID id)       throws IOException;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Implementación de DAO con serialización JSON (Gson).
+ * Persiste listas de entidades en archivos .json en el directorio de datos.
+ *
+ * @param <T> tipo de la entidad a persistir
+ */
+public class JsonDAO<T> {
+
+    private final Gson   gson;
+    private final Path   archivo;
+    private final Type   tipoLista;
+
+    /**
+     * @param rutaArchivo ruta del archivo JSON de datos
+     * @param tipoLista   tipo de la lista, p.ej. {@code new TypeToken<List<Facultad>>(){}.getType()}
+     */
+    public JsonDAO(String rutaArchivo, Type tipoLista) {
+        this.gson      = new GsonBuilder()
+                              .registerTypeAdapter(
+                                  java.time.LocalDate.class,
+                                  (JsonSerializer<java.time.LocalDate>)
+                                      (src, t, ctx) -> new JsonPrimitive(src.toString()))
+                              .setPrettyPrinting()
+                              .create();
+        this.archivo   = Path.of(rutaArchivo);
+        this.tipoLista = tipoLista;
+    }
+
+    /** Lee la lista completa del archivo JSON. */
+    @SuppressWarnings("unchecked")
+    public <T2> List<T2> leerTodos() throws IOException {
+        if (!Files.exists(archivo)) return new ArrayList<>();
+        try (Reader r = Files.newBufferedReader(archivo)) {
+            List<T2> lista = gson.fromJson(r, tipoLista);
+            return lista != null ? lista : new ArrayList<>();
+        }
+    }
+
+    /** Escribe la lista completa en el archivo JSON. */
+    public <T2> void guardarTodos(List<T2> lista) throws IOException {
+        Files.createDirectories(archivo.getParent());
+        try (Writer w = Files.newBufferedWriter(archivo)) {
+            gson.toJson(lista, tipoLista, w);
+        }
+    }
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+%\section{\java\ versus \rust: análisis comparativo de implementación}
+
+\section[Java versus Rust: análisis comparativo]{\java\ versus \rust: análisis comparativo de implementación}
+\label{sec:java-vs-rust}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\noindent
+La implementación paralela del mismo dominio en dos lenguajes tan disímiles como
+\java\ y \rust\ suscita reflexiones que no emergen cuando se estudia un solo lenguaje.
+La tabla~\ref{tab:java-rust-comparacion} sintetiza las diferencias más relevantes
+desde la perspectiva de la implementación concreta del sistema estatutario.
+
+%{\shorthandoff{<>"'`}
+	
+\begingroup
+\small
+\begin{longtable}{@{} L{2.8cm} L{5.2cm} L{5.5cm} @{}}
+	% --- Título y encabezado de la primera página ---
+	\caption{Comparación de implementación \java\ vs.\ \rust\ en el sistema estatutario.} \label{tab:java-rust-comparacion} \\
+	\toprule
+	\textbf{Dimensión} & \textbf{\java} & \textbf{\rust} \\
+	\midrule
+	\endfirsthead
+	
+	% --- Encabezado para las páginas siguientes ---
+	\multicolumn{3}{c}{{\bfseries \tablename\ \thetable{} -- Continuación}} \\
+	\toprule
+	\textbf{Dimensión} & \textbf{\java} & \textbf{\rust} \\
+	\midrule
+	\endhead
+	
+	% --- Pie de tabla para páginas intermedias ---
+	\midrule
+	\multicolumn{3}{r}{{Continúa en la siguiente página...}} \\
+	\bottomrule
+	\endfoot
+	
+	% --- Pie de tabla final ---
+	\bottomrule
+	\endlastfoot
+	
+	% --- Datos de la tabla ---
+	Herencia de clases &
+	Herencia simple de clases + implementación múltiple de interfaces. \texttt{Facultad extends UnidadAcademica} &
+	No existe herencia de structs. Se usan traits + composición. Un struct \texttt{Facultad} implementa el trait \texttt{EntidadAcademica} \\
+	\midrule
+	
+	Manejo de \texttt{null} &
+	\texttt{null} es un valor válido para cualquier referencia; riesgo de \texttt{NullPointerException}. Se mitiga con \texttt{Objects.requireNonNull} &
+	No existe \texttt{null}. Se usa \verb|Option<T>|: \verb|Some(valor)| o \verb|None|. El compilador obliga a tratar ambos casos \\
+	\midrule
+	
+	Excepciones &
+	Excepciones checked y unchecked. La jerarquía \texttt{EstatutoException} impone tratamiento explícito &
+	No hay excepciones. Se usa \verb|Result<T, E>|: \verb|Ok(valor)| o \verb|Err(error)|. Propagación con operador \verb|?| \\
+	\midrule
+	
+	Concurrencia &
+	\texttt{synchronized}, \texttt{ReentrantLock}, \texttt{ExecutorService}. Errores de carrera detectados en ejecución &
+	\verb|Arc<Mutex<T>>|. El compilador garantiza que \verb|T| implemente \verb|Send + Sync|. Errores de carrera detectados en compilación \\
+\end{longtable}
+\endgroup
+	
+%} % ← \shorthandon implícito al cerrar el grupo
+
+\noindent
+Un aspecto particularmente ilustrativo es el tratamiento del valor ausente.
+En \java, la búsqueda de un \texttt{Estudiante} por código puede retornar \texttt{null},
+con el consecuente riesgo de \texttt{NullPointerException} si el llamador omite la
+verificación. En \rust, la función retorna \texttt{Option<\&Estudiante>} y el compilador
+obliga al llamador a tratar tanto el caso \texttt{Some(\&e)} como el caso \texttt{None}
+mediante un \texttt{match} exhaustivo. El error no puede ocurrir en ejecución porque
+no puede compilar sin tratamiento explícito. Esta diferencia no es menor:
+habida cuenta de que los sistemas de información universitaria operan con datos críticos
+de matrícula y evaluación, la garantía en tiempo de compilación resulta especialmente
+valiosa.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Sprints 6 y 7: implementación en \java}
+\label{sec:sprints-6-7}
+\addcontentsline{toc}{section}{Sprints 6 y 7: implementación en \java}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\begin{tcolorbox}[sprintBox, title={Sprint 6 — Clases del dominio y pruebas unitarias}]
+\textbf{Duración:} 2 semanas\\[4pt]
+\textbf{Objetivo:} Implementar las clases del dominio (modelo) con cobertura de pruebas unitarias $\geq 80\%$.
+
+\vspace{6pt}
+\begin{tabularx}{\linewidth}{@{}L{4cm}L{4cm}L{4.5cm}@{}}
+\toprule
+\textbf{Entregable técnico} & \textbf{Característica del programa} & \textbf{Criterio de la rúbrica} \\
+\midrule
+Clases del paquete \texttt{modelo} compiladas y documentadas con Javadoc &
+  Clases de entidad organizacional, actores y gestión académica &
+  Código compila sin errores; Javadoc presente en todas las clases públicas \\
+\addlinespace
+Suite de pruebas JUnit~5 para \texttt{UnidadAcademica}, \texttt{Persona} y subclases &
+  Herencia, polimorfismo, encapsulamiento y validaciones &
+  Cobertura $\geq 80\%$ medida con JaCoCo; todos los tests pasan \\
+\addlinespace
+Demostración de polimorfismo con lista de \texttt{UnidadAcademica} &
+  Despacho dinámico y patrón Factory Method &
+  El método \texttt{getTipo()} retorna el valor correcto para cada subclase \\
+\addlinespace
+Jerarquía de excepciones \texttt{EstatutoException} completa &
+  Manejo estructurado de errores &
+  Las excepciones llevan código de error; los mensajes son descriptivos \\
+\bottomrule
+\end{tabularx}
+
+\vspace{8pt}
+\textbf{Definición de terminado:} El proyecto Maven compila con \texttt{mvn clean test};
+todos los tests pasan; el reporte JaCoCo muestra cobertura $\geq 80\%$;
+el Javadoc se genera sin advertencias con \texttt{mvn javadoc:javadoc}.
+\end{tcolorbox}
+
+\vspace{10pt}
+
+\begin{tcolorbox}[actividadIA, title={Actividad IA — Sprint 6: Generación de pruebas unitarias}]
+\textbf{Contexto:} Se propone explorar el uso de asistentes generativos como auxiliares
+en la escritura de pruebas unitarias, tarea que los estudiantes suelen postergar por
+considerarla tediosa pero que resulta decisiva para la calidad del software.
+
+\vspace{6pt}
+\textbf{Tarea concreta:}
+\begin{enumerate}
+  \item Solicitar a un asistente generativo: \textit{``Genera una clase de prueba JUnit~5
+  para la clase \texttt{Escuela} del paquete \texttt{co.edu.udistrital.estatuto.modelo}.
+  Incluye pruebas para: agregar docente duplicado (debe retornar \texttt{false}),
+  agregar docente nulo (debe lanzar \texttt{NullPointerException}),
+  y verificar que \texttt{getTipo()} retorne exactamente la cadena \textit{`Escuela'}'.}
+  \item Integrar el código generado al proyecto y ejecutarlo con \texttt{mvn test}.
+  \item Identificar al menos dos casos de prueba que el asistente omitió.
+  \item Escribir manualmente esos casos y documentar el proceso en el informe.
+\end{enumerate}
+
+\vspace{6pt}
+\textbf{Reflexión:} ¿El asistente generativo prueba el comportamiento esperado
+o solamente el comportamiento que el código ya exhibe? ¿Cuál es la diferencia
+entre ambos enfoques?
+
+\vspace{6pt}
+\textbf{Advertencia epistémica:} Un asistente generativo no conoce el \acuerdo\
+ni las reglas de negocio específicas de la \ud. Las pruebas que genera son
+genéricas. La responsabilidad de identificar los casos límite que importan
+---como la restricción de que una Escuela no admita docentes duplicados--- recae
+exclusivamente en el programador.
+\end{tcolorbox}
+
+\vspace{10pt}
+
+\begin{tcolorbox}[sprintBox, title={Sprint 7 — Interfaz gráfica, persistencia y patrones de diseño}]
+\textbf{Duración:} 2 semanas\\[4pt]
+\textbf{Objetivo:} Integrar la capa de vista (JavaFX), la persistencia JSON y al menos
+dos patrones de diseño documentados.
+
+\vspace{6pt}
+\begin{tabularx}{\linewidth}{@{}L{4cm}L{4cm}L{4.5cm}@{}}
+\toprule
+\textbf{Entregable técnico} & \textbf{Característica del programa} & \textbf{Criterio de la rúbrica} \\
+\midrule
+Aplicación JavaFX con ventana principal funcional &
+  TabPane con pestaña de Facultades operativa (CRUD completo) &
+  La aplicación inicia sin errores; las operaciones CRUD persisten al reiniciar \\
+\addlinespace
+Persistencia JSON con \texttt{JsonDAO} para Facultades &
+  Serialización/deserialización con Gson; archivos \texttt{.json} en directorio \texttt{datos/} &
+  Los objetos se recuperan correctamente tras reiniciar la aplicación \\
+\addlinespace
+Implementación documentada de Factory Method &
+  Creación polimórfica de unidades académicas &
+  El código usa \texttt{UnidadAcademicaFactory.crear()} en lugar de constructores directos \\
+\addlinespace
+Implementación documentada de Observer &
+  Notificación automática de cambios en el Consejo &
+  Al menos dos observadores concretos suscritos; la bitácora registra todos los eventos \\
+\addlinespace
+Informe técnico de 3 páginas &
+  Justificación de decisiones de diseño &
+  El informe explica por qué se eligió cada patrón en relación al dominio estatutario \\
+\bottomrule
+\end{tabularx}
+
+\vspace{8pt}
+\textbf{Definición de terminado:} La aplicación empaquetada como JAR ejecutable arranca,
+muestra la lista de Facultades guardadas previamente y permite agregar/editar/eliminar.
+Los patrones de diseño están implementados y su uso se demuestra en la aplicación.
+\end{tcolorbox}
+
+\vspace{10pt}
+
+\begin{tcolorbox}[actividadIA, title={Actividad IA — Sprint 7: Patrones de diseño con asistencia generativa}]
+\textbf{Tarea:}
+\begin{enumerate}
+  \item Solicitar a un asistente generativo la implementación del patrón Strategy
+  para el cálculo de nota final. Especificar: \textit{``Implementa el patrón Strategy
+  en Java 17 para calcular la nota final de un estudiante. Las estrategias deben ser:
+  promedio aritmético, promedio ponderado (cada evidencia tiene un peso de 0 a 1),
+  y nota máxima. Usa la clase \texttt{Evidencia} ya definida en el dominio.''}
+  \item Comparar la solución generada con la implementada en la sección~\ref{sec:java-patrones}.
+  \item Identificar diferencias en nomenclatura, estructura y cobertura de casos.
+  \item Evaluar: ¿el asistente añadió estrategias que usted no había considerado?
+  ¿eliminó alguna restricción del dominio?
+\end{enumerate}
+
+\vspace{6pt}
+\textbf{Reflexión crítica:} El valor de un asistente generativo en la implementación de
+patrones de diseño reside en la velocidad de andamiaje (\textit{scaffolding}), no en
+la comprensión del dominio. El patrón puede ser sintácticamente correcto pero
+semánticamente inadecuado si el asistente desconoce las reglas de negocio.
+La revisión crítica de la solución generada es, por ello, una competencia irrenunciable.
+\end{tcolorbox}

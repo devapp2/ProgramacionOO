@@ -1,0 +1,364 @@
+%% ============================================================
+%% main.tex — Archivo principal
+%% Programación Orientada a Objetos: Diseño e Implementación
+%% de un Sistema de Información Académico-Administrativo para
+%% la Universidad Distrital Francisco José de Caldas
+%%
+%% Autor: Roberto Albeiro Pava-Díaz, Ph.D.
+%% ORCID: 0000-0003-0440-892X
+%% Versión: 2026
+%% ============================================================
+
+\documentclass[12pt, twoside, openright]{book}
+
+%% ─────────────────────────────────────────────
+%% IDIOMA Y CODIFICACIÓN
+%% ─────────────────────────────────────────────
+%\usepackage[utf8]{inputenc}
+%\usepackage[T1]{fontenc}
+%\usepackage{mathpazo}
+
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Pagella}
+\usepackage{unicode-math}
+\setmathfont{TeX Gyre Pagella Math}
+
+\usepackage[spanish, es-tabla, es-lcroman]{babel}
+\shorthandoff{<>} 
+
+%% ─────────────────────────────────────────────
+%% TIPOGRAFÍA: Palatino + matemáticas Pazo
+%% ─────────────────────────────────────────────
+\usepackage{microtype}
+
+%% ─────────────────────────────────────────────
+%% MÁRGENES E INTERLINEADO
+%% ─────────────────────────────────────────────
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm,
+            headheight=28pt]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+%% ─────────────────────────────────────────────
+%% COLORES
+%% ─────────────────────────────────────────────
+\usepackage[dvipsnames, svgnames, table]{xcolor}
+\definecolor{udazul}{RGB}{0, 70, 127}
+\definecolor{udgris}{RGB}{80, 80, 80}
+\definecolor{codebg}{RGB}{248, 248, 248}
+\definecolor{linkblue}{RGB}{0, 70, 140}
+\definecolor{udagris}{RGB}{150, 150, 150}
+
+%% ─────────────────────────────────────────────
+%% HIPERVÍNCULOS
+%% ─────────────────────────────────────────────
+\usepackage[colorlinks=true,
+            linkcolor=linkblue,
+            citecolor=linkblue,
+            urlcolor=linkblue,
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfauthor={Roberto Albeiro Pava-Díaz},
+            pdftitle={POO: Sistema de Información UD},
+            pdfsubject={Programación Orientada a Objetos},
+            pdfkeywords={POO, Java, Rust, Universidad Distrital, Estatuto}
+            ]{hyperref}
+
+%% ─────────────────────────────────────────────
+%% GRÁFICOS
+%% ─────────────────────────────────────────────
+\usepackage{graphicx}
+\graphicspath{{./figuras/}}
+
+%% ─────────────────────────────────────────────
+%% TABLAS
+%% ─────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+
+%% ─────────────────────────────────────────────
+%% LISTADOS DE CÓDIGO
+%% ─────────────────────────────────────────────
+\usepackage{listings}
+
+%% Estilo base
+\lstdefinestyle{baseStyle}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{OliveGreen}\itshape,
+  frame=single,
+  framerule=0.5pt,
+  keepspaces=true,
+  keywordstyle=\color{udazul}\bfseries,
+  numbers=left,
+  numbersep=6pt,
+  numberstyle=\tiny\color{udagris},
+  rulecolor=\color{udgris!30},
+  showstringspaces=false,
+  stringstyle=\color{BrickRed},
+  tabsize=4,
+  xleftmargin=15pt
+}
+
+%% Java
+\lstdefinestyle{javaStyle}{
+  style=baseStyle,
+  language=Java,
+  morekeywords={var, record, sealed, permits}
+}
+
+%% Rust (definición de lenguaje ad hoc)
+\lstdefinelanguage{Rust}{
+  morekeywords={fn, let, mut, struct, enum, impl, trait, use, pub, mod,
+                match, if, else, while, for, in, return, self, Self,
+                where, type, const, static, ref, move, Box, Option,
+                Result, Vec, String, str, i32, i64, u32, u64, usize,
+                bool, true, false, Some, None, Ok, Err, derive, Clone,
+                Copy, Debug, Display, Default, Arc, Rc, Mutex},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]"
+}
+\lstdefinestyle{rustStyle}{
+  style=baseStyle,
+  language=Rust
+}
+
+%% PlantUML (tratado como código genérico)
+\lstdefinelanguage{PlantUML}{
+  morekeywords={@startuml, @enduml, class, abstract, interface, enum,
+                package, namespace, extends, implements, skinparam,
+                left, right, to, as, note, end, hide, show, actor,
+                usecase, component, node, database, rectangle, cloud},
+  sensitive=false,
+  morecomment=[l]{'},
+  morestring=[b]"
+}
+\lstdefinestyle{plantumlStyle}{
+  style=baseStyle,
+  language=PlantUML,
+  keywordstyle=\color{Plum}\bfseries
+}
+
+%% ─────────────────────────────────────────────
+%% CAJAS DE ACTIVIDAD (tcolorbox)
+%% ─────────────────────────────────────────────
+\usepackage[most]{tcolorbox}
+
+\tcbset{
+  actividadIA/.style={
+    enhanced,
+    colback=udazul!6,
+    colframe=udazul,
+    colbacktitle=udazul,
+    coltitle=white,
+    fonttitle=\bfseries\small,
+    boxrule=0.8pt,
+    arc=4pt,
+    left=6pt, right=6pt, top=6pt, bottom=6pt,
+    attach boxed title to top left={yshift=-2mm, xshift=6mm},
+    boxed title style={arc=3pt, boxrule=0pt, colframe=udazul}
+  },
+  sprintBox/.style={
+    enhanced,
+    colback=gray!5,
+    colframe=udgris!60,
+    fonttitle=\bfseries\small,
+    boxrule=0.6pt,
+    arc=3pt,
+    left=5pt, right=5pt, top=5pt, bottom=5pt
+  }
+}
+
+%% ─────────────────────────────────────────────
+%% ENCABEZADOS Y PIES DE PÁGINA
+%% ─────────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\small\textcolor{udgris}{\leftmark}}
+\fancyhead[RO]{\small\textcolor{udgris}{\rightmark}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\usepackage{csquotes}  % requerido por biblatex con babel
+
+%% ─────────────────────────────────────────────
+%% BIBLIOGRAFÍA (biblatex + biber)
+%% ─────────────────────────────────────────────
+\usepackage[backend=biber,
+            style=ieee,
+            sortcites=true,
+            sorting=nyt,
+            maxbibnames=6,
+            minbibnames=3,
+            uniquelist=false]{biblatex}
+\addbibresource{referencias.bib}
+
+%% ─────────────────────────────────────────────
+%% PAQUETES COMPLEMENTARIOS
+%% ─────────────────────────────────────────────
+%\usepackage{amsmath, amssymb}
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, labelsep=period}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\setlist[itemize]{noitemsep, topsep=2pt}
+\setlist[enumerate]{noitemsep, topsep=2pt}
+\usepackage{footnote}
+
+
+%% ─────────────────────────────────────────────
+%% COMANDOS PERSONALIZADOS
+%% ─────────────────────────────────────────────
+\newcommand{\ud}{Universidad Distrital Francisco José de Caldas}
+\newcommand{\acuerdo}{Acuerdo 004 de 2025}
+\DeclareRobustCommand{\java}{\textit{Java}}
+\DeclareRobustCommand{\rust}{\textit{Rust}}
+\newcommand{\plantuml}{PlantUML}
+\newcommand{\poo}{Programación Orientada a Objetos (POO)}
+
+%% Tabla de sprint (cabecera reutilizable)
+\newcommand{\sprintcabecera}{%
+  \toprule
+  \textbf{Entregable técnico} & \textbf{Característica del programa} & \textbf{Criterio de la rúbrica} \\
+  \midrule
+}
+
+%% ─────────────────────────────────────────────
+%% INICIO DEL DOCUMENTO
+%% ─────────────────────────────────────────────
+\begin{document}
+
+%% ─── PORTADA ─────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+
+  {\color{udazul}\rule{\linewidth}{2pt}}
+  \vspace{0.5cm}
+
+  {\Large\bfseries\color{udazul}
+    Programación Orientada a Objetos:\\[0.3em]
+    Diseño e Implementación de un\\[0.3em]
+    Sistema de Información Académico-Administrativo\\[0.3em]
+    para la Universidad Distrital\\[0.3em]
+    Francisco José de Caldas
+  }
+
+  \vspace{0.5cm}
+  {\color{udazul}\rule{\linewidth}{2pt}}
+
+  \vspace{2cm}
+
+  {\large\bfseries Roberto Albeiro Pava-Díaz, Ph.D.}\\[0.4em]
+  {\normalsize ORCID: \href{https://orcid.org/0000-0003-0440-892X}{0000-0003-0440-892X}}\\[0.3em]
+  {\normalsize Profesor de planta, Facultad de Ingeniería}\\[0.2em]
+  {\normalsize Universidad Distrital ``Francisco José de Caldas''}\\[0.2em]
+  {\normalsize Bogotá, Colombia}
+
+  \vfill
+
+  \includegraphics[width=3cm]{logo_ud}   %% Requiere figuras/logo_ud.pdf o .png
+
+  \vspace{1cm}
+
+  {\normalsize Bogotá, 2026}
+
+  \vspace{0.5cm}
+  {\color{udazul}\rule{\linewidth}{1pt}}
+
+  {\small\textit{Caso de estudio: Estatuto General (Acuerdo 004 de 2025)
+    y Estatuto Académico de la \ud}}
+\end{titlepage}
+
+%% ─── PÁGINAS PRELIMINARES ────────────────────
+\frontmatter
+\pagestyle{plain}
+
+\cleardoublepage
+\chapter*{Advertencia sobre el empleo de IA generativa en el desarrollo de habilidades en programación de computadores}
+\addcontentsline{toc}{chapter}{Advertencia sobre el uso de software generativo}
+
+Es importante resaltar que los asistentes de IA generativa, cuyo advenimiento en los entornos de aprendizaje de programación resulta en una herramienta de posible efecto adverso para los estudiantes, lo que  configura una oportunidad pedagógica significativa para el desarrollo real de competencias de diseño orientado a objetos en estudiantes de pregrado.
+
+El presente texto  se considera consustancial al momento histórico de la enseñanza de la programación, y asume de manera explícita a lo largo de cada sprint y examina con mayor detenimiento en el capítulo~\ref{cap:ia-etica}, donde se discuten implicaciones éticas y didácticas que todavía parecen estar en construcción.
+
+....
+
+\cleardoublepage
+\chapter*{Prefacio}
+\addcontentsline{toc}{chapter}{Prefacio}
+
+\noindent
+Veinte años de docencia en la Facultad de Ingeniería de la \ud\ imponen
+una convicción: la Programación Orientada a Objetos se aprende haciendo,
+equivocándose y revisando. No hay atajo. Este libro nació de esa certeza,
+aunada a la necesidad concreta de disponer de un caso de estudio que
+resonara con la realidad institucional del estudiante distrital ---un
+caso que no fuera una biblioteca imaginaria ni un sistema bancario de
+manual, sino nuevo  modelo de operación de la propia universidad.
+El Acuerdo 004 de 2025, que actualizó el Estatuto General, y la propuesta
+de Estatuto Académico de noviembre de 2025 proporcionan ese caso: un dominio
+rico, complejo, con jerarquías de unidades académicas, actores institucionales
+disímiles y procesos de evaluación formativa que requieren modelado cuidadoso.
+
+\bigskip\noindent
+El libro sigue una metodología ágil de doce \textit{sprints}, cada uno
+con entregables técnicos evaluables mediante rúbricas explícitas.
+Se presentan implementaciones paralelas en \java\ y \rust\ ---elección
+deliberada, habida cuenta de que el contraste entre el modelo orientado
+a objetos clásico y el sistema de propiedad (\textit{ownership}) de \rust\
+suscita reflexiones que enriquecen la comprensión de ambos paradigmas.
+
+\bigskip\noindent
+{\raggedleft
+Roberto Albeiro Pava-Díaz\\
+Bogotá, marzo de 2026\par}
+
+%% ─── ÍNDICES ─────────────────────────────────
+\cleardoublepage
+\tableofcontents
+
+\cleardoublepage
+\listoffigures
+\addcontentsline{toc}{chapter}{\listfigurename}
+
+\cleardoublepage
+\listoftables
+\addcontentsline{toc}{chapter}{\listtablename}
+
+%% ─── CUERPO DEL LIBRO ────────────────────────
+\mainmatter
+\pagestyle{fancy}
+
+\include{cap01}
+\include{cap02}
+\include{cap03}
+\include{cap04}
+\include{cap05}
+\include{cap06}
+\include{cap07}
+
+%% ─── APÉNDICES ───────────────────────────────
+\appendix
+\include{apendices}
+
+%% ─── BIBLIOGRAFÍA ────────────────────────────
+\backmatter
+\cleardoublepage
+\addcontentsline{toc}{chapter}{Referencias}
+\printbibliography[title={Referencias}]
+
+\end{document}
